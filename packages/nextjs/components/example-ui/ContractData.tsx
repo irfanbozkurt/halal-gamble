@@ -22,7 +22,7 @@ export const ContractData = () => {
 
   const { data: totalCounter } = useScaffoldContractRead({
     contractName: "Lottery",
-    functionName: "totalCounter",
+    functionName: "startTimeOfContract",
   });
 
   // const { data: currentGreeting, isLoading: isGreetingLoading } = useScaffoldContractRead({

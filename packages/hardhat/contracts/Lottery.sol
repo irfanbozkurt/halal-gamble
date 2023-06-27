@@ -18,7 +18,7 @@ contract Lottery {
   );
   event TicketRevealed(
     address indexed buyer,
-    uint256 lotteryNo,
+    uint256 indexed lotteryNo,
     uint256 ticketNo,
     uint8 ticketType,
     uint256 randomNumber,
@@ -31,8 +31,8 @@ contract Lottery {
     uint8 ticketType,
     uint256 prize
   );
-  event PrizeCollected(address indexed owner, uint256 lotteryNo, uint256 ticketNo, uint256 prize);
-  event TicketLost(address indexed owner, uint256 lotteryNo, uint256 ticketNo);
+  event PrizeCollected(address indexed owner, uint256 indexed lotteryNo, uint256 ticketNo, uint256 prize);
+  event TicketLost(address indexed owner, uint256 indexed lotteryNo, uint256 ticketNo);
 
   struct Ticket {
     address owner;
