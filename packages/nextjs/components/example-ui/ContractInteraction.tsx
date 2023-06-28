@@ -11,7 +11,7 @@ export const ContractInteraction = () => {
   const [newGreeting, setNewGreeting] = useState<BigNumber>();
 
   const { writeAsync, isLoading } = useScaffoldContractWrite({
-    contractName: "Lottery",
+    contractName: "HalalGamble",
     functionName: "withdrawEther",
     args: [newGreeting],
     value: "0.01",

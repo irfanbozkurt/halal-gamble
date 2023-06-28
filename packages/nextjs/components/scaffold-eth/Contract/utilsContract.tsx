@@ -1,7 +1,12 @@
 import { Dispatch, SetStateAction } from "react";
 import { Contract, utils } from "ethers";
+import { ethers } from "ethers";
 import { FunctionFragment } from "ethers/lib/utils";
 import { DisplayVariable, ReadOnlyFunctionForm, WriteOnlyFunctionForm } from "~~/components/scaffold-eth";
+
+const generateHalalHash = (account: string, rnd: number): string => {
+  return ethers.utils.keccak256(new ethers.utils.AbiCoder().encode(["uint256", "address"], [rnd, account]));
+};
 
 /**
  * @param {Contract} contract
@@ -98,17 +103,15 @@ const getContractWriteMethods = (
       ? contractMethodsAndVariables
           .map((fn, idx) => {
             const isWriteableFunction = fn.stateMutability !== "view" && fn.stateMutability !== "pure";
-            if (isWriteableFunction) {
-              return (
-                <WriteOnlyFunctionForm
-                  key={`${fn.name}-${idx}`}
-                  functionFragment={fn}
-                  contractAddress={contract.address}
-                  setRefreshDisplayVariables={setRefreshDisplayVariables}
-                />
-              );
-            }
-            return null;
+            if (!isWriteableFunction) return null;
+            return (
+              <WriteOnlyFunctionForm
+                key={`${fn.name}-${idx}`}
+                functionFragment={fn}
+                contractAddress={contract.address}
+                setRefreshDisplayVariables={setRefreshDisplayVariables}
+              />
+            );
           })
           .filter(n => n)
       : [],
@@ -192,6 +195,7 @@ const getParsedContractFunctionArgs = (form: Record<string, any>) => {
 };
 
 export {
+  generateHalalHash,
   getAllContractFunctions,
   getContractReadOnlyMethodsWithParams,
   getContractVariablesAndNoParamsReadMethods,

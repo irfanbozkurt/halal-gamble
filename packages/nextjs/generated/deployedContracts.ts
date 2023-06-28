@@ -4,8 +4,291 @@ const contracts = {
       chainId: "31337",
       name: "localhost",
       contracts: {
+        HalalGamble: {
+          address: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+          abi: [
+            {
+              anonymous: false,
+              inputs: [
+                {
+                  indexed: true,
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  indexed: true,
+                  internalType: "address",
+                  name: "entrar",
+                  type: "address",
+                },
+              ],
+              name: "EnterRoom",
+              type: "event",
+            },
+            {
+              anonymous: false,
+              inputs: [
+                {
+                  indexed: true,
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  indexed: true,
+                  internalType: "address",
+                  name: "revealer",
+                  type: "address",
+                },
+                {
+                  indexed: false,
+                  internalType: "bool",
+                  name: "valid",
+                  type: "bool",
+                },
+                {
+                  indexed: false,
+                  internalType: "uint256",
+                  name: "randomNumber",
+                  type: "uint256",
+                },
+              ],
+              name: "Revealed",
+              type: "event",
+            },
+            {
+              anonymous: false,
+              inputs: [
+                {
+                  indexed: true,
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+              ],
+              name: "RoomAbolished",
+              type: "event",
+            },
+            {
+              anonymous: false,
+              inputs: [
+                {
+                  indexed: true,
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  indexed: true,
+                  internalType: "address",
+                  name: "creator",
+                  type: "address",
+                },
+                {
+                  indexed: false,
+                  internalType: "uint256",
+                  name: "roomFee",
+                  type: "uint256",
+                },
+                {
+                  indexed: false,
+                  internalType: "uint8",
+                  name: "capacity",
+                  type: "uint8",
+                },
+              ],
+              name: "RoomCreated",
+              type: "event",
+            },
+            {
+              anonymous: false,
+              inputs: [
+                {
+                  indexed: true,
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  indexed: true,
+                  internalType: "address",
+                  name: "winner",
+                  type: "address",
+                },
+                {
+                  indexed: false,
+                  internalType: "uint256",
+                  name: "prize",
+                  type: "uint256",
+                },
+              ],
+              name: "RoomEnded",
+              type: "event",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+              ],
+              name: "abolishRoom",
+              outputs: [],
+              stateMutability: "nonpayable",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomFee",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "capacity",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "revealExpirationPeriod",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "hashRndNumber",
+                  type: "bytes32",
+                },
+              ],
+              name: "createRoom",
+              outputs: [],
+              stateMutability: "payable",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "hashRndNumber",
+                  type: "bytes32",
+                },
+              ],
+              name: "joinRoom",
+              outputs: [],
+              stateMutability: "payable",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "rndNumber",
+                  type: "uint256",
+                },
+              ],
+              name: "reveal",
+              outputs: [],
+              stateMutability: "nonpayable",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
+              name: "rooms",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "createdBy",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "roomFee",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "capacity",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "startTime",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "revealExpirationPeriod",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "revealExpiresAt",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "endTime",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "xor",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "winner",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "prize",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+              ],
+              name: "triggerRevealExpiry",
+              outputs: [],
+              stateMutability: "nonpayable",
+              type: "function",
+            },
+          ],
+        },
         Lottery: {
-          address: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+          address: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
           abi: [
             {
               anonymous: false,
@@ -17,7 +300,7 @@ const contracts = {
                   type: "address",
                 },
                 {
-                  indexed: false,
+                  indexed: true,
                   internalType: "uint256",
                   name: "lotteryNo",
                   type: "uint256",
@@ -85,7 +368,7 @@ const contracts = {
                   type: "address",
                 },
                 {
-                  indexed: false,
+                  indexed: true,
                   internalType: "uint256",
                   name: "lotteryNo",
                   type: "uint256",
@@ -218,6 +501,45 @@ const contracts = {
               type: "event",
             },
             {
+              inputs: [],
+              name: "FULL_PRICE",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [],
+              name: "HALF_PRICE",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [],
+              name: "QUARTER_PRICE",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
               inputs: [
                 {
                   internalType: "bytes32",
@@ -232,7 +554,7 @@ const contracts = {
               ],
               name: "buyTicket",
               outputs: [],
-              stateMutability: "nonpayable",
+              stateMutability: "payable",
               type: "function",
             },
             {
@@ -291,32 +613,6 @@ const contracts = {
               type: "function",
             },
             {
-              inputs: [
-                {
-                  internalType: "uint256",
-                  name: "amount",
-                  type: "uint256",
-                },
-              ],
-              name: "depositEther",
-              outputs: [],
-              stateMutability: "payable",
-              type: "function",
-            },
-            {
-              inputs: [],
-              name: "getBalance",
-              outputs: [
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
               inputs: [],
               name: "getCurrentLotteryInPurchase",
               outputs: [
@@ -333,112 +629,6 @@ const contracts = {
               inputs: [],
               name: "getCurrentLotteryInReveal",
               outputs: [
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "uint256",
-                  name: "i",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "lotteryNo",
-                  type: "uint256",
-                },
-              ],
-              name: "getIthOwnedTicketNo",
-              outputs: [
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint8",
-                  name: "",
-                  type: "uint8",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "uint256",
-                  name: "i",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "lotteryNo",
-                  type: "uint256",
-                },
-              ],
-              name: "getIthWinningTicket",
-              outputs: [
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
-              ],
-              stateMutability: "nonpayable",
-              type: "function",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "uint256",
-                  name: "lotteryNo",
-                  type: "uint256",
-                },
-              ],
-              name: "getLastOwnedTicketNo",
-              outputs: [
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint8",
-                  name: "",
-                  type: "uint8",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "uint256",
-                  name: "unixTime",
-                  type: "uint256",
-                },
-              ],
-              name: "getLotteryNos",
-              outputs: [
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
                 {
                   internalType: "uint256",
                   name: "",
@@ -490,25 +680,6 @@ const contracts = {
               inputs: [
                 {
                   internalType: "uint256",
-                  name: "lotteryNo",
-                  type: "uint256",
-                },
-              ],
-              name: "getYieldedAmounts",
-              outputs: [
-                {
-                  internalType: "uint256[]",
-                  name: "",
-                  type: "uint256[]",
-                },
-              ],
-              stateMutability: "nonpayable",
-              type: "function",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "uint256",
                   name: "ticketNo",
                   type: "uint256",
                 },
@@ -534,19 +705,6 @@ const contracts = {
                 },
               ],
               stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "uint256",
-                  name: "amount",
-                  type: "uint256",
-                },
-              ],
-              name: "withdrawEther",
-              outputs: [],
-              stateMutability: "nonpayable",
               type: "function",
             },
           ],

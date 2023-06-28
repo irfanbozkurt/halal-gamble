@@ -14,19 +14,23 @@ type ContractInputProps = {
   form: Record<string, any>;
   stateObjectKey: string;
   paramType: utils.ParamType;
+  disabled?: boolean;
 };
 
 /**
  * Generic Input component to handle input's based on their function param type
  */
-export const ContractInput = ({ setForm, form, stateObjectKey, paramType }: ContractInputProps) => {
+export const ContractInput = ({ setForm, form, stateObjectKey, paramType, disabled }: ContractInputProps) => {
   const inputProps = {
     name: stateObjectKey,
     value: form[stateObjectKey],
     placeholder: paramType.name ? `${paramType.type} ${paramType.name}` : paramType.type,
-    onChange: (value: any) => {
-      setForm(form => ({ ...form, [stateObjectKey]: value }));
-    },
+    onChange: disabled
+      ? () => {}
+      : (value: any) => {
+          setForm(form => ({ ...form, [stateObjectKey]: value }));
+        },
+    disabled: disabled,
   };
 
   if (paramType.type === "address") {

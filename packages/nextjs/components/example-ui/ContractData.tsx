@@ -21,17 +21,17 @@ export const ContractData = () => {
   const greetingRef = useRef<HTMLDivElement>(null);
 
   const { data: totalCounter } = useScaffoldContractRead({
-    contractName: "Lottery",
+    contractName: "HalalGamble",
     functionName: "startTimeOfContract",
   });
 
   // const { data: currentGreeting, isLoading: isGreetingLoading } = useScaffoldContractRead({
-  //   contractName: "Lottery",
+  //   contractName: "HalalGamble",
   //   functionName: "greeting",
   // });
 
   // useScaffoldEventSubscriber({
-  //   contractName: "Lottery",
+  //   contractName: "HalalGamble",
   //   eventName: "GreetingChange",
   //   listener: (greetingSetter, newGreeting, premium, value) => {
   //     console.log(greetingSetter, newGreeting, premium, value);
@@ -43,7 +43,7 @@ export const ContractData = () => {
   //   isLoading: isLoadingEvents,
   //   error: errorReadingEvents,
   // } = useScaffoldEventHistory({
-  //   contractName: "Lottery",
+  //   contractName: "HalalGamble",
   //   eventName: "GreetingChange",
   //   fromBlock: Number(process.env.NEXT_PUBLIC_DEPLOY_BLOCK) || 0,
   //   filters: { greetingSetter: address },
@@ -52,8 +52,8 @@ export const ContractData = () => {
 
   // console.log("Events:", isLoadingEvents, errorReadingEvents, myGreetingChangeEvents);
 
-  const { data: lottery } = useScaffoldContract({ contractName: "Lottery" });
-  console.log("lottery: ", lottery);
+  const { data: HalalGamble } = useScaffoldContract({ contractName: "HalalGamble" });
+  console.log("HalalGamble: ", HalalGamble);
 
   const { showAnimation } = useAnimationConfig(totalCounter);
 
