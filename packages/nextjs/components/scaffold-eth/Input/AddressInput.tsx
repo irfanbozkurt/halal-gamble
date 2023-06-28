@@ -10,7 +10,7 @@ const isENS = (address = "") => address.endsWith(".eth") || address.endsWith(".x
 /**
  * Address input with ENS name resolution
  */
-export const AddressInput = ({ value, name, placeholder, onChange }: CommonInputProps) => {
+export const AddressInput = ({ value, name, placeholder, onChange, className }: CommonInputProps) => {
   const { data: ensAddress, isLoading: isEnsAddressLoading } = useEnsAddress({
     name: value,
     enabled: isENS(value),
@@ -56,6 +56,7 @@ export const AddressInput = ({ value, name, placeholder, onChange }: CommonInput
       placeholder={placeholder}
       error={ensAddress === null}
       value={value}
+      className={className}
       onChange={handleChange}
       disabled={isEnsAddressLoading || isEnsNameLoading}
       prefix={

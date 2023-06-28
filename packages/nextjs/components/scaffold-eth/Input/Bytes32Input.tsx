@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { ethers } from "ethers";
 import { CommonInputProps, InputBase } from "~~/components/scaffold-eth";
 
-export const Bytes32Input = ({ value, onChange, name, placeholder, disabled }: CommonInputProps) => {
+export const Bytes32Input = ({ value, onChange, name, placeholder, className, disabled }: CommonInputProps) => {
   const convertStringToBytes32 = useCallback(() => {
     if (!value) {
       return;
@@ -20,6 +20,7 @@ export const Bytes32Input = ({ value, onChange, name, placeholder, disabled }: C
       disabled={disabled}
       value={value}
       placeholder={placeholder}
+      className={className}
       onChange={disabled ? () => {} : onChange}
       suffix={
         !disabled && (

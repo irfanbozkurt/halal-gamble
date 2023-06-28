@@ -12,6 +12,7 @@ export const IntegerInput = ({
   name,
   placeholder,
   variant = IntegerVariant.UINT256,
+  className,
 }: IntegerInputProps) => {
   const [inputError, setInputError] = useState(false);
   const multiplyBy1e18 = useCallback(() => {
@@ -34,6 +35,7 @@ export const IntegerInput = ({
       name={name}
       value={value}
       placeholder={placeholder}
+      className={className}
       error={inputError}
       onChange={onChange}
       suffix={

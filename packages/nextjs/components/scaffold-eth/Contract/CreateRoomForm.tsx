@@ -1,13 +1,10 @@
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TransactionReceipt } from "@ethersproject/abstract-provider";
-import { BigNumber, ethers } from "ethers";
+import { BigNumber } from "ethers";
 import { FunctionFragment } from "ethers/lib/utils";
 import { useAccount, useContractWrite, useNetwork, useWaitForTransaction } from "wagmi";
 import {
   ContractInput,
-  IntegerInput,
-  TxReceipt,
   generateHalalHash,
   getFunctionInputKey,
   getParsedContractFunctionArgs,
@@ -16,29 +13,29 @@ import {
 import { useTransactor } from "~~/hooks/scaffold-eth";
 import { getTargetNetwork, notification, parseTxnValue } from "~~/utils/scaffold-eth";
 
-const getInitialFormState = (functionFragment: FunctionFragment, account?: string, rnd?: number) =>
-  functionFragment.inputs.reduce((acc, input, inputIndex) => {
+const getInitialFormState = (createRoomFn: FunctionFragment, account?: string, rnd?: number) =>
+  createRoomFn.inputs.reduce((acc, input, inputIndex) => {
     let val = "";
     if (input.name == "hashRndNumber" && account) val = generateHalalHash(account, rnd!);
-    acc[getFunctionInputKey(functionFragment, input, inputIndex)] = val;
+    acc[getFunctionInputKey(createRoomFn, input, inputIndex)] = val;
     return acc;
   }, {} as Record<string, any>);
 
 type TCreateRoomFormProps = {
-  functionFragment: FunctionFragment;
+  createRoomFn: FunctionFragment;
   contractAddress: string;
 };
 
-export const CreateRoomForm = ({ functionFragment, contractAddress }: TCreateRoomFormProps) => {
-  /* */
+export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFormProps) => {
+  /* User Account */
   const { address: currentAccount } = useAccount();
 
-  /* RND management */
+  /* RND */
   const rnd = useRef(Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
 
   /* set form */
   const [form, setForm] = useState<Record<string, any>>(() =>
-    getInitialFormState(functionFragment, currentAccount, rnd.current),
+    getInitialFormState(createRoomFn, currentAccount, rnd.current),
   );
   const [txValue, setTxValue] = useState<string | BigNumber>("");
   const { chain } = useNetwork();
@@ -49,11 +46,11 @@ export const CreateRoomForm = ({ functionFragment, contractAddress }: TCreateRoo
   const {
     data: result,
     isLoading,
-    writeAsync,
+    writeAsync: createRoom,
   } = useContractWrite({
     address: contractAddress,
-    functionName: functionFragment.name,
-    abi: [functionFragment],
+    functionName: createRoomFn.name,
+    abi: [createRoomFn],
     args: getParsedContractFunctionArgs(form),
     mode: "recklesslyUnprepared",
     overrides: {
@@ -70,8 +67,8 @@ export const CreateRoomForm = ({ functionFragment, contractAddress }: TCreateRoo
   }, [txResult]);
 
   // TODO use `useMemo` to optimize also update in ReadOnlyFunctionForm
-  const inputs = functionFragment.inputs.map((input, inputIndex) => {
-    const key = getFunctionInputKey(functionFragment, input, inputIndex);
+  const inputs = createRoomFn.inputs.map((input, inputIndex) => {
+    const key = getFunctionInputKey(createRoomFn, input, inputIndex);
     return (
       <ContractInput
         key={key}
@@ -81,12 +78,13 @@ export const CreateRoomForm = ({ functionFragment, contractAddress }: TCreateRoo
           setForm(updatedFormValue);
         }}
         form={form}
+        className="font-bai-jamjuree w-full bg-[url('/assets/gradient-bg.png')] bg-[length:100%_100%] border-primary text-lg sm:text-2xl placeholder-black text-black"
         stateObjectKey={key}
         paramType={input}
       />
     );
   });
-  const zeroInputs = inputs.length === 0 && !functionFragment.payable;
+  const zeroInputs = inputs.length === 0 && !createRoomFn.payable;
 
   // Handle tx value respecting roomFee
   const feeKey = Object.keys(form).find(k => k.includes("roomFee"));
@@ -94,51 +92,33 @@ export const CreateRoomForm = ({ functionFragment, contractAddress }: TCreateRoo
   if (txValue != givenFee) setTxValue(givenFee);
 
   return (
-    <div className="py-5 space-y-3 first:pt-0 last:pb-1 w-2/3">
-      <div className={`flex gap-3 ${zeroInputs ? "flex-row justify-between items-center" : "flex-col"}`}>
-        <p className="font-medium my-0 break-words">{functionFragment.name}</p>
+    <div className="max-w-screen-sm w-5/6 flex flex-col mt-6 px-7 py-3 opacity-80 rounded-3xl shadow-lg border-2 border-primary">
+      <div className={`flex ${zeroInputs ? "flex-row justify-between items-center" : "flex-col"}`}>
+        <span className="text-3xl sm:text-6xl text-orange-100">create a room_</span>
 
         {/* Function inputs */}
-        {inputs}
+        <div className="mt-8 flex flex-col sm:flex-col gap-2 sm:gap-5">{inputs}</div>
 
         {/* Send button */}
-        <div className="flex justify-between gap-2">
-          {!zeroInputs && (
-            <div className="flex-grow basis-0">
-              {displayedTxResult ? <TxReceipt txResult={displayedTxResult} /> : null}
-            </div>
-          )}
-
-          <div
-            className={`flex ${
-              writeDisabled &&
-              "tooltip before:content-[attr(data-tip)] before:right-[-10px] before:left-auto before:transform-none"
-            }`}
-            data-tip={`${writeDisabled && "Wallet not connected or in the wrong network"}`}
+        <div className="flex justify-between mt-4 gap-2">
+          <button
+            className={`bg-orange-100 w-3/5 btn btn-sm ${isLoading ? "loading" : ""} bg`}
+            disabled={writeDisabled || isLoading}
+            onClick={async () => {
+              if (!createRoom) return;
+              try {
+                await writeTxn(createRoom());
+                setForm(getInitialFormState(createRoomFn, currentAccount, rnd.current));
+              } catch (e: any) {
+                const message = getParsedEthersError(e);
+                notification.error(message);
+              }
+            }}
           >
-            <button
-              className={`btn btn-secondary btn-sm ${isLoading ? "loading" : ""}`}
-              disabled={writeDisabled}
-              onClick={async () => {
-                if (!writeAsync) return;
-                try {
-                  await writeTxn(writeAsync());
-                } catch (e: any) {
-                  const message = getParsedEthersError(e);
-                  notification.error(message);
-                }
-              }}
-            >
-              Send 💸
-            </button>
-          </div>
+            {!isLoading && <> Send </>}
+          </button>
         </div>
       </div>
-      {zeroInputs && txResult ? (
-        <div className="flex-grow basis-0">
-          <TxReceipt txResult={txResult} />
-        </div>
-      ) : null}
     </div>
   );
 };

@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { ethers } from "ethers";
 import { CommonInputProps, InputBase } from "~~/components/scaffold-eth";
 
-export const BytesInput = ({ value, onChange, name, placeholder }: CommonInputProps) => {
+export const BytesInput = ({ value, onChange, name, className, placeholder }: CommonInputProps) => {
   const convertStringToBytes = useCallback(() => {
     onChange(
       ethers.utils.isHexString(value)
@@ -17,6 +17,7 @@ export const BytesInput = ({ value, onChange, name, placeholder }: CommonInputPr
       value={value}
       placeholder={placeholder}
       onChange={onChange}
+      className={className}
       suffix={
         <div
           className="self-center cursor-pointer text-xl font-semibold px-4 text-accent"

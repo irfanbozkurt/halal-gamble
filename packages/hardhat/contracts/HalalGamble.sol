@@ -51,8 +51,8 @@ contract HalalGamble {
     );
 
     // Calculate room index
-    while (rooms[roomCount].createdBy != address(0)) roomCount++;
     uint256 roomNo = roomCount;
+    roomCount++;
     // Initialize room fields
     rooms[roomNo].roomNo = roomNo;
     rooms[roomNo].createdBy = msg.sender;
@@ -67,6 +67,7 @@ contract HalalGamble {
     if (msg.value > roomFee) payable(msg.sender).transfer(msg.value - roomFee);
 
     emit RoomCreated(roomNo, msg.sender, roomFee, capacity);
+    emit EnterRoom(roomNo, msg.sender);
   }
 
   function abolishRoom(uint256 roomNo) external {
