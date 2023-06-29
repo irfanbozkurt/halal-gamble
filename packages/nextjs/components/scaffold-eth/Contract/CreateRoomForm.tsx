@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { TransactionReceipt } from "@ethersproject/abstract-provider";
 import { BigNumber } from "ethers";
 import { FunctionFragment } from "ethers/lib/utils";
+import { useLocalStorage } from "usehooks-ts";
 import { useAccount, useContractWrite, useNetwork, useWaitForTransaction } from "wagmi";
 import {
   ContractInput,
@@ -10,13 +11,13 @@ import {
   getParsedContractFunctionArgs,
   getParsedEthersError,
 } from "~~/components/scaffold-eth";
-import { useTransactor } from "~~/hooks/scaffold-eth";
+import { useScaffoldContractRead, useTransactor } from "~~/hooks/scaffold-eth";
 import { getTargetNetwork, notification, parseTxnValue } from "~~/utils/scaffold-eth";
 
-const getInitialFormState = (createRoomFn: FunctionFragment, account?: string, rnd?: number) =>
+const getInitialFormState = (createRoomFn: FunctionFragment, rnd: number, account?: string) =>
   createRoomFn.inputs.reduce((acc, input, inputIndex) => {
     let val = "";
-    if (input.name == "hashRndNumber" && account) val = generateHalalHash(account, rnd!);
+    if (input.name == "hashRndNumber" && account) val = generateHalalHash(account, rnd);
     acc[getFunctionInputKey(createRoomFn, input, inputIndex)] = val;
     return acc;
   }, {} as Record<string, any>);
@@ -30,13 +31,29 @@ export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFor
   /* User Account */
   const { address: currentAccount } = useAccount();
 
-  /* RND */
-  const rnd = useRef(Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
+  /////////////////////////////////////////////
+  /*********** Get next room no ***************/
+  /////////////////////////////////////////////
+  // Because we'll store the generated random number in local storage,
+  // and we'll use 'roomNo' in the storage key.
+  const { data: roomNoBignum } = useScaffoldContractRead({
+    contractName: "HalalGamble",
+    functionName: "roomCount",
+  });
+  const roomNo = roomNoBignum?.toString();
 
-  /* set form */
-  const [form, setForm] = useState<Record<string, any>>(() =>
-    getInitialFormState(createRoomFn, currentAccount, rnd.current),
-  );
+  /////////////////////////////////////////////
+  /****************** RND ********************/
+  /////////////////////////////////////////////
+  const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
+  const [rnd, setRnd] = useLocalStorage<number>(rndLocalKey, Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
+  const renewRnd = () => setRnd(Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
+  if (!rnd) renewRnd();
+
+  /////////////////////////////////////////////
+  /*********** Create room tx prepare **********/
+  /////////////////////////////////////////////
+  const [form, setForm] = useState<Record<string, any>>(() => getInitialFormState(createRoomFn, rnd, currentAccount));
   const [txValue, setTxValue] = useState<string | BigNumber>("");
   const { chain } = useNetwork();
   const writeTxn = useTransactor();
@@ -58,7 +75,7 @@ export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFor
     },
   });
 
-  const [displayedTxResult, setDisplayedTxResult] = useState<TransactionReceipt>();
+  const [, setDisplayedTxResult] = useState<TransactionReceipt>();
   const { data: txResult } = useWaitForTransaction({
     hash: result?.hash,
   });
@@ -108,7 +125,7 @@ export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFor
               if (!createRoom) return;
               try {
                 await writeTxn(createRoom());
-                setForm(getInitialFormState(createRoomFn, currentAccount, rnd.current));
+                renewRnd();
               } catch (e: any) {
                 const message = getParsedEthersError(e);
                 notification.error(message);

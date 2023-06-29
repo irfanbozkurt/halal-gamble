@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Abi } from "abitype";
+import { ethers } from "ethers";
 import type { NextPage } from "next";
 import { useAccount, useContract, useProvider } from "wagmi";
-import { TRoomProps } from "~~/components/ActiveRoom";
+import { ActiveRoomList } from "~~/components/ActiveRoomList";
 import { MetaHeader } from "~~/components/MetaHeader";
-import { RoomList } from "~~/components/RoomList";
+import { MyRoom } from "~~/components/MyRoom";
 import { getAllContractFunctions } from "~~/components/scaffold-eth";
 import { CreateRoomForm } from "~~/components/scaffold-eth/Contract/CreateRoomForm";
 import {
@@ -13,6 +14,8 @@ import {
   useScaffoldEventHistory,
   useScaffoldEventSubscriber,
 } from "~~/hooks/scaffold-eth";
+import { TActiveRoomProps, TMyCandidateRoom } from "~~/types/halalTypes";
+import { TEndedRoomProps, TRoomProps } from "~~/types/halalTypes";
 import { getContractNames } from "~~/utils/scaffold-eth/contractNames";
 
 const Rooms: NextPage = () => {
@@ -61,7 +64,7 @@ const Rooms: NextPage = () => {
   const [allRooms, setAllRooms] = useState<TRoomProps[]>([]);
   const [abolishedRoomIds, setAbolishedRoomIds] = useState<Set<string>>(new Set());
   const [endedRooms, setEndedRooms] = useState<TRoomProps[]>([]);
-  const [activeRooms, setActiveRooms] = useState<TRoomProps[]>([]);
+  const [activeRooms, setActiveRooms] = useState<TActiveRoomProps[]>([]);
 
   useEffect(() => {
     setAllRooms(
@@ -71,8 +74,8 @@ const Rooms: NextPage = () => {
           creatorAddress: e.args[1],
           roomFee: e.args[2],
           capacity: e.args[3],
-        } as TRoomProps;
-      }) as TRoomProps[],
+        } as TActiveRoomProps;
+      }) as TActiveRoomProps[],
     );
   }, [roomCreatedEvents]);
 
@@ -87,8 +90,8 @@ const Rooms: NextPage = () => {
           roomNo: e.args[0].toString(),
           winner: e.args[1],
           prize: e.args[2],
-        } as TRoomProps;
-      }) as TRoomProps[],
+        };
+      }) as TEndedRoomProps[],
     );
   }, [roomEndedEvents]);
 
@@ -100,7 +103,7 @@ const Rooms: NextPage = () => {
             (!abolishedRoomIds || !abolishedRoomIds.has(r.roomNo)) &&
             !(endedRooms || []).some(er => er.roomNo == r.roomNo),
         )
-        .reverse() as TRoomProps[],
+        .reverse() as TActiveRoomProps[],
     );
   }, [allRooms, abolishedRoomIds, endedRooms]);
 
@@ -115,9 +118,10 @@ const Rooms: NextPage = () => {
         const newRoom = {
           roomNo: newRoomNo,
           creatorAddress: creator,
+          participants: [creator],
           roomFee: roomFee.toString(),
           capacity: capacity,
-        } as TRoomProps;
+        } as TActiveRoomProps;
         return [newRoom, ...prev];
       });
     },
@@ -130,6 +134,9 @@ const Rooms: NextPage = () => {
         prev.add(roomNo.toString());
         return prev;
       });
+      setAllRooms(prev => {
+        return prev.filter(room => room.roomNo != roomNo.toString());
+      });
     },
   });
   useScaffoldEventSubscriber({
@@ -140,15 +147,57 @@ const Rooms: NextPage = () => {
         const endedRoomNo = roomNo.toString();
         if (prev.some(e => e.roomNo == endedRoomNo)) return prev;
 
-        const endedRoom: TRoomProps = {
+        const endedRoom = {
           roomNo: endedRoomNo,
           winner: winner,
           prize: prize.toString(),
-        } as TRoomProps;
+        } as TEndedRoomProps;
         return [endedRoom, ...prev];
       });
     },
   });
+
+  //////////////////////////////////////////
+  /*********** My Rooms (in play) *********/
+  //////////////////////////////////////////
+
+  const [myRooms, setMyRooms] = useState<TMyCandidateRoom[]>([]);
+  const [myRoomTrigger, triggerMyRooms] = useState<boolean>(false);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!contract) return;
+      const tempContr = contract.attach(contract.address);
+
+      const participatedRoomNos = (
+        await Promise.all(
+          activeRooms.map(async room => {
+            const isActiveParticipant = await (
+              tempContr.callStatic as { isActiveParticipant: any }
+            ).isActiveParticipant(room.roomNo, currentAccount);
+            return isActiveParticipant ? room.roomNo : undefined;
+          }),
+        )
+      ).filter(room => room != undefined);
+
+      const saturatedRoomNos = new Set(
+        (
+          await Promise.all(
+            participatedRoomNos.map(async roomNo => {
+              if (!roomNo) return;
+              const participantCount = parseInt(
+                await (tempContr.callStatic as { getCurrentParticipantCount: any }).getCurrentParticipantCount(roomNo),
+              );
+              return participantCount == activeRooms.find(room => room.roomNo == roomNo)?.capacity ? roomNo : undefined;
+            }),
+          )
+        ).filter(room => room != undefined),
+      );
+
+      setMyRooms(activeRooms.filter(room => saturatedRoomNos.has(room.roomNo)).map(room => room as TMyCandidateRoom));
+    };
+    run();
+  }, [currentAccount, activeRooms, myRoomTrigger]);
 
   return (
     <>
@@ -157,24 +206,61 @@ const Rooms: NextPage = () => {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree&display=swap" rel="stylesheet" />
 
-      {contract && (
-        <div className="flex">
-          <div className="flex items-center flex-col pt-5 w-1/2">
-            <CreateRoomForm
-              createRoomFn={contractFunctions.find(f => f.name == "createRoom")!}
-              contractAddress={contract.address}
-            />
-          </div>
+      <div className="flex flex-col w-full items-center">
+        {!contract && <span className="text-6xl text-orange-100 opacity-10 pt-24 pb-3">no deployment found</span>}
+        {contract && (
+          <>
+            <div className="flex w-full">
+              <div className="flex items-center flex-col pt-5 w-1/2">
+                {currentAccount && (
+                  <CreateRoomForm
+                    createRoomFn={contractFunctions.find(f => f.name == "createRoom")!}
+                    contractAddress={contract.address}
+                  />
+                )}
+                {!currentAccount && (
+                  <span className="text-6xl text-orange-100 text-center py-10">Connect to create rooms</span>
+                )}
+              </div>
 
-          <div className="flex items-center flex-col pt-10 mx-10 w-1/2">
-            <RoomList
-              joinRoomFn={contractFunctions.find(f => f.name == "joinRoom")!}
-              rooms={activeRooms}
-              contractAddress={contract.address}
-            />
-          </div>
-        </div>
-      )}
+              <div className="flex items-center flex-col pt-10 mx-10 w-1/2">
+                <ActiveRoomList
+                  triggerMyRooms={triggerMyRooms}
+                  joinRoomFn={contractFunctions.find(f => f.name == "joinRoom")!}
+                  rooms={activeRooms}
+                  contractAddress={contract.address}
+                />
+              </div>
+            </div>
+
+            <hr className="w-11/12 my-10 h-0.5 bg-neutral-800 opacity-10" />
+
+            <div className="w-full flex flex-col items-center">
+              <span className="text-6xl text-orange-100 text-center pb-10">my rooms</span>
+              <div className="grid grid-cols-2 gap-2 w-11/12">
+                {myRooms.map(
+                  room =>
+                    currentAccount && (
+                      <MyRoom
+                        key={room.roomNo}
+                        contractAddress={contract.address}
+                        setMyRooms={setMyRooms}
+                        abolishRoomFn={contractFunctions.find(f => f.name == "abolishRoom")!}
+                        revealFn={contractFunctions.find(f => f.name == "reveal")!}
+                        triggerRevealExpiryFn={contractFunctions.find(f => f.name == "triggerRevealExpiry")!}
+                        roomNo={room.roomNo}
+                        creatorAddress={room.creatorAddress}
+                        roomFee={room.roomFee}
+                        capacity={room.capacity}
+                      />
+                    ),
+                )}
+                {/* <div className="flex items-center justify-center">AAAA</div> */}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </>
   );
 };

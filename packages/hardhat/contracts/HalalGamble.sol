@@ -1,5 +1,7 @@
 //SPDX-License-Identifier: MIT
 
+import "hardhat/console.sol";
+
 contract HalalGamble {
   /* Room Management */
   struct Room {
@@ -14,6 +16,7 @@ contract HalalGamble {
     uint256 endTime;
     //
     address[] participants;
+    mapping(address => bool) participantsMap;
     mapping(address => bytes32) randHash;
     mapping(address => uint8) revealStatus; // 0: unrevealed, 1: invalid reveal, 2: revealed
     //
@@ -32,7 +35,29 @@ contract HalalGamble {
   event RoomEnded(uint256 indexed roomNo, address indexed winner, uint256 prize);
 
   mapping(uint256 => Room) public rooms;
-  uint256 roomCount;
+  uint256 public roomCount;
+
+  /* Getters for Arrays of struct, as their values are not returned via a rooms() call. */
+  function getParticipants(uint256 roomNo) external view returns (address[] memory) {
+    return rooms[roomNo].participants;
+  }
+
+  function getValidRevealers(uint256 roomNo) external view returns (address[] memory) {
+    return rooms[roomNo].validRevealers;
+  }
+
+  function getInvalidRevealers(uint256 roomNo) external view returns (address[] memory) {
+    return rooms[roomNo].invalidRevealers;
+  }
+
+  function getCurrentParticipantCount(uint256 roomNo) external view returns (uint256) {
+    return rooms[roomNo].participants.length;
+  }
+
+  function isActiveParticipant(uint256 roomNo, address who) external view returns (bool) {
+    if (rooms[roomNo].winner != address(0)) return false;
+    return rooms[roomNo].participantsMap[who];
+  }
 
   /* Business Logic */
 
@@ -62,6 +87,7 @@ contract HalalGamble {
     rooms[roomNo].revealExpirationPeriod = revealExpirationPeriod;
     rooms[roomNo].participants.push(msg.sender);
     rooms[roomNo].randHash[msg.sender] = hashRndNumber;
+    rooms[roomNo].participantsMap[msg.sender] = true;
 
     // Pay back the surplus
     if (msg.value > roomFee) payable(msg.sender).transfer(msg.value - roomFee);
@@ -86,13 +112,16 @@ contract HalalGamble {
 
   function joinRoom(uint256 roomNo, bytes32 hashRndNumber) external payable {
     require(rooms[roomNo].participants.length != 0, "No such room");
-    require(rooms[roomNo].randHash[msg.sender] == bytes32(0), "You already joined this room");
+    console.log(msg.sender);
+    console.log(roomNo);
+    require(!rooms[roomNo].participantsMap[msg.sender], "You already joined this room");
     require(rooms[roomNo].participants.length < rooms[roomNo].capacity, "Capacity full");
     uint256 fee = rooms[roomNo].roomFee;
     require(msg.value >= fee, "Send more than room fee");
 
     rooms[roomNo].participants.push(msg.sender);
     rooms[roomNo].randHash[msg.sender] = hashRndNumber;
+    rooms[roomNo].participantsMap[msg.sender] = true;
 
     // Pay back the surplus
     if (msg.value > fee) payable(msg.sender).transfer(msg.value - fee);
@@ -102,7 +131,7 @@ contract HalalGamble {
 
   function reveal(uint256 roomNo, uint256 rndNumber) external {
     require(rooms[roomNo].participants.length == rooms[roomNo].capacity, "Capacity must be fulfilled first");
-    require(rooms[roomNo].randHash[msg.sender] != bytes32(0), "You didn't join this room");
+    require(rooms[roomNo].participantsMap[msg.sender], "You didn't join this room");
     require(rooms[roomNo].revealStatus[msg.sender] == 0, "You already revealed your number");
 
     bool validReveal;

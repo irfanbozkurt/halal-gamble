@@ -174,6 +174,106 @@ const contracts = {
                   name: "roomNo",
                   type: "uint256",
                 },
+              ],
+              name: "getCurrentParticipantCount",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+              ],
+              name: "getInvalidRevealers",
+              outputs: [
+                {
+                  internalType: "address[]",
+                  name: "",
+                  type: "address[]",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+              ],
+              name: "getParticipants",
+              outputs: [
+                {
+                  internalType: "address[]",
+                  name: "",
+                  type: "address[]",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+              ],
+              name: "getValidRevealers",
+              outputs: [
+                {
+                  internalType: "address[]",
+                  name: "",
+                  type: "address[]",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "who",
+                  type: "address",
+                },
+              ],
+              name: "isActiveParticipant",
+              outputs: [
+                {
+                  internalType: "bool",
+                  name: "",
+                  type: "bool",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
                 {
                   internalType: "bytes32",
                   name: "hashRndNumber",
@@ -201,6 +301,19 @@ const contracts = {
               name: "reveal",
               outputs: [],
               stateMutability: "nonpayable",
+              type: "function",
+            },
+            {
+              inputs: [],
+              name: "roomCount",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
               type: "function",
             },
             {

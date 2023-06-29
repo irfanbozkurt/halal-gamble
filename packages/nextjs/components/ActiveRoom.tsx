@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { BigNumber, ethers } from "ethers";
-import { FunctionFragment } from "ethers/lib/utils.js";
+import { useLocalStorage } from "usehooks-ts";
 import { useAccount, useContractWrite, useNetwork } from "wagmi";
 import {
   Address,
@@ -9,18 +9,8 @@ import {
   getParsedEthersError,
 } from "~~/components/scaffold-eth";
 import { useScaffoldEventHistory, useScaffoldEventSubscriber, useTransactor } from "~~/hooks/scaffold-eth";
+import { TActiveRoomProps, TMyCandidateRoom } from "~~/types/halalTypes";
 import { getTargetNetwork, notification, parseTxnValue } from "~~/utils/scaffold-eth";
-
-export type TRoomProps = {
-  roomNo: string;
-  creatorAddress: string;
-  roomFee: string;
-  capacity: number;
-  winner?: string;
-  prize?: string;
-  contractAddres?: string;
-  joinRoomFn?: FunctionFragment;
-};
 
 type Reveal = {
   revealer: string;
@@ -29,38 +19,47 @@ type Reveal = {
 };
 
 export const ActiveRoom = ({
-  contractAddres,
+  contractAddress,
   joinRoomFn,
   roomNo,
   creatorAddress,
   roomFee,
+  triggerMyRooms,
   capacity,
-  winner,
-  prize,
-}: TRoomProps) => {
+}: TActiveRoomProps) => {
   /* User Account */
   const { address: currentAccount } = useAccount();
 
   /* RND */
-  const rnd = useRef(Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
+  const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
+  const [rnd, setRnd] = useLocalStorage<number>(rndLocalKey, Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
 
   /////////////////////////////////////////////
   /*********** Join Room Logic ***************/
   /////////////////////////////////////////////
   /* set form */
-  const [form] = useState<Record<string, any>>(() => {
+  const [form, setForm] = useState<Record<string, any>>(() => {
     return {
       roomNo: roomNo,
-      hashRndNumber: currentAccount && generateHalalHash(currentAccount, rnd.current),
-    } as Record<string, any>;
+      hashRndNumber: currentAccount && generateHalalHash(currentAccount, rnd),
+    };
   });
-  const [txValue] = useState<string | BigNumber>(roomFee);
+
+  if (!form || !form.roomNo || form.roomNo != roomNo)
+    setForm({
+      roomNo: roomNo,
+      hashRndNumber: currentAccount && generateHalalHash(currentAccount, rnd),
+    });
+
+  const [txValue, setTxValue] = useState<string>(roomFee);
+  if (txValue.toString() != roomFee) setTxValue(roomFee);
+
   const { chain } = useNetwork();
   const writeTxn = useTransactor();
   const writeDisabled = !chain || chain?.id !== getTargetNetwork().id;
 
   const { isLoading, writeAsync: joinRoom } = useContractWrite({
-    address: contractAddres,
+    address: contractAddress,
     functionName: joinRoomFn && joinRoomFn.name,
     abi: joinRoomFn && [joinRoomFn],
     args: getParsedContractFunctionArgs(form),
@@ -100,7 +99,6 @@ export const ActiveRoom = ({
       enterRoomEvents == undefined || enterRoomEvents.length == 0 ? [] : enterRoomEvents?.map(e => e.args[1] as string),
     );
   }, [enterRoomEvents]);
-
   useEffect(() => {
     setRevealed(
       revealedEvents?.reduce((acc, e) => {
@@ -117,14 +115,17 @@ export const ActiveRoom = ({
   useScaffoldEventSubscriber({
     contractName: "HalalGamble",
     eventName: "EnterRoom",
-    listener: (roomNo, entrar) => {
+    listener: (_roomNo, entrar) => {
+      if (_roomNo.toString() != roomNo) return;
       setParticipants(prev => Array.from(new Set([entrar, ...prev])));
+      triggerMyRooms(prev => !prev);
     },
   });
   useScaffoldEventSubscriber({
     contractName: "HalalGamble",
     eventName: "Revealed",
-    listener: (roomNo, revealer, valid, randomNumber) => {
+    listener: (_roomNo, revealer, valid, randomNumber) => {
+      if (_roomNo.toString() != roomNo) return;
       setRevealed(prev => {
         prev.set(revealer, {
           revealer: revealer,
@@ -136,7 +137,7 @@ export const ActiveRoom = ({
     },
   });
 
-  // console.log(`@@@@@@@@@@@@ roomNo: ${roomNo}`);
+  // console.log(`@@@@@@@@@@@@ activeRoom: ${roomNo}`);
   // console.log(`creator: ${creatorAddress}`);
   // console.log(`fee: ${roomFee.toString()}`);
   // console.log(`capacity: ${capacity}`);
@@ -147,6 +148,7 @@ export const ActiveRoom = ({
   //////////////////////////////////////////
   /*********** Button Management **********/
   //////////////////////////////////////////
+  const [disableAfterSuccess, setDisableAfterSuccess] = useState(false);
   let buttonText = "";
   let userJoinedRoom = false;
   if (!isLoading)
@@ -167,18 +169,30 @@ export const ActiveRoom = ({
       <div className="flex items-center space-x-3 ">
         <button
           className={`bg-orange-100 btn btn-sm ${isLoading ? "loading" : ""} bg`}
-          disabled={writeDisabled || isLoading || userJoinedRoom || isRoomFull}
+          disabled={writeDisabled || isLoading || userJoinedRoom || isRoomFull || disableAfterSuccess}
           onClick={async () => {
             if (!joinRoom) return;
             try {
               await writeTxn(joinRoom());
+              setDisableAfterSuccess(true);
+              triggerMyRooms(prev => !prev);
+              setRnd(Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
             } catch (e: any) {
               const message = getParsedEthersError(e);
               notification.error(message);
             }
           }}
         >
-          {!isLoading && (userJoinedRoom ? <> JOINED </> : isRoomFull ? <> FULL </> : <> JOIN </>)}
+          {!isLoading &&
+            (userJoinedRoom ? (
+              <> JOINED </>
+            ) : isRoomFull ? (
+              <> FULL </>
+            ) : disableAfterSuccess ? (
+              <>JOINED</>
+            ) : (
+              <> JOIN </>
+            ))}
         </button>
 
         <Address address={creatorAddress} disableAddressLink={true} />

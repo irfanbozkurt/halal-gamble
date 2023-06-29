@@ -5,7 +5,7 @@ import { FunctionFragment } from "ethers/lib/utils";
 import { DisplayVariable, ReadOnlyFunctionForm, WriteOnlyFunctionForm } from "~~/components/scaffold-eth";
 
 const generateHalalHash = (account: string, rnd: number): string => {
-  return ethers.utils.keccak256(new ethers.utils.AbiCoder().encode(["uint256", "address"], [rnd, account]));
+  return ethers.utils.keccak256(new ethers.utils.AbiCoder().encode(["uint256", "address"], [rnd || 0, account || ""]));
 };
 
 /**
