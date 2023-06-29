@@ -1,22 +1,25 @@
 import { useEffect, useState } from "react";
-import { BigNumber, ethers } from "ethers";
-import { useLocalStorage } from "usehooks-ts";
+import { ethers } from "ethers";
+import { FunctionFragment, ParamType } from "ethers/lib/utils.js";
 import { useAccount, useContractWrite, useNetwork } from "wagmi";
 import {
   Address,
   generateHalalHash,
+  getFunctionInputKey,
   getParsedContractFunctionArgs,
   getParsedEthersError,
 } from "~~/components/scaffold-eth";
 import { useScaffoldEventHistory, useScaffoldEventSubscriber, useTransactor } from "~~/hooks/scaffold-eth";
-import { TActiveRoomProps, TMyCandidateRoom } from "~~/types/halalTypes";
+import { TActiveRoomProps } from "~~/types/halalTypes";
 import { getTargetNetwork, notification, parseTxnValue } from "~~/utils/scaffold-eth";
 
-type Reveal = {
-  revealer: string;
-  valid: boolean;
-  rand: string;
-};
+const getInitialFormState = (joinRoomFn: FunctionFragment, roomNo: string) =>
+  joinRoomFn.inputs.reduce((acc, input, inputIndex) => {
+    let val = "";
+    if (input.name == "roomNo") val = roomNo;
+    acc[getFunctionInputKey(joinRoomFn, input, inputIndex)] = val;
+    return acc;
+  }, {} as Record<string, any>);
 
 export const ActiveRoom = ({
   contractAddress,
@@ -30,27 +33,12 @@ export const ActiveRoom = ({
   /* User Account */
   const { address: currentAccount } = useAccount();
 
-  /* RND */
-  const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
-  const [rnd, setRnd] = useLocalStorage<number>(rndLocalKey, Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
+  if (!roomNo) return null;
 
   /////////////////////////////////////////////
-  /*********** Join Room Logic ***************/
+  /*********** join room tx prepare **********/
   /////////////////////////////////////////////
-  /* set form */
-  const [form, setForm] = useState<Record<string, any>>(() => {
-    return {
-      roomNo: roomNo,
-      hashRndNumber: currentAccount && generateHalalHash(currentAccount, rnd),
-    };
-  });
-
-  if (!form || !form.roomNo || form.roomNo != roomNo)
-    setForm({
-      roomNo: roomNo,
-      hashRndNumber: currentAccount && generateHalalHash(currentAccount, rnd),
-    });
-
+  const [form, setForm] = useState<Record<string, any>>(() => getInitialFormState(joinRoomFn, roomNo));
   const [txValue, setTxValue] = useState<string>(roomFee);
   if (txValue.toString() != roomFee) setTxValue(roomFee);
 
@@ -69,6 +57,56 @@ export const ActiveRoom = ({
     },
   });
 
+  /////////////////////////////////////////////
+  /****************** RND ********************/
+  /////////////////////////////////////////////
+
+  useEffect(() => {
+    if (!roomNo) {
+      console.log(`RETURNING FROM useEffect BECAUSE roomNo is ${roomNo}`);
+      return;
+    }
+
+    const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
+    const fromStorage = localStorage.getItem(rndLocalKey);
+    if (fromStorage) {
+      console.log(`RANDOM NUMBER FOUND IN STORAGE FOR GIVEN ROOMNO AND ACCOUNT: ${fromStorage}`);
+      setForm(prev => {
+        const hashRndNumberInputAndIndex = joinRoomFn.inputs
+          .map((inp, idx) => [inp.name == "hashRndNumber" ? inp : undefined, idx])
+          .filter(([inp]) => inp)[0];
+        prev[
+          getFunctionInputKey(
+            joinRoomFn,
+            hashRndNumberInputAndIndex[0] as ParamType,
+            hashRndNumberInputAndIndex[1] as number,
+          )
+        ] = generateHalalHash(parseInt(fromStorage), currentAccount!, roomNo);
+        return prev;
+      });
+    } else {
+      const newRandStr = Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)).toString();
+      const newRand = parseInt(newRandStr);
+
+      console.log(`COULD NOT FIND RANDOM NUMBER IN STORAGE FOR GIVEN KEY. PUTTING: ${newRandStr}`);
+
+      localStorage.setItem(rndLocalKey, newRandStr);
+      setForm(prev => {
+        const hashRndNumberInputAndIndex = joinRoomFn.inputs
+          .map((inp, idx) => [inp.name == "hashRndNumber" ? inp : undefined, idx])
+          .filter(([inp]) => inp)[0];
+        prev[
+          getFunctionInputKey(
+            joinRoomFn,
+            hashRndNumberInputAndIndex[0] as ParamType,
+            hashRndNumberInputAndIndex[1] as number,
+          )
+        ] = generateHalalHash(newRand, currentAccount!, roomNo);
+        return prev;
+      });
+    }
+  }, [currentAccount]);
+
   //////////////////////////////////////////
   /*********** Get Room History ***********/
   //////////////////////////////////////////
@@ -81,36 +119,14 @@ export const ActiveRoom = ({
     },
     blockData: false,
   });
-  const { data: revealedEvents } = useScaffoldEventHistory({
-    contractName: "HalalGamble",
-    eventName: "Revealed",
-    fromBlock: Number(process.env.NEXT_PUBLIC_DEPLOY_BLOCK) || 0,
-    filters: {
-      roomNo: ethers.BigNumber.from(roomNo),
-    },
-    blockData: false,
-  });
 
   const [participants, setParticipants] = useState<string[]>([]);
-  const [revealed, setRevealed] = useState<Map<string, Reveal>>(new Map());
 
   useEffect(() => {
     setParticipants(
       enterRoomEvents == undefined || enterRoomEvents.length == 0 ? [] : enterRoomEvents?.map(e => e.args[1] as string),
     );
   }, [enterRoomEvents]);
-  useEffect(() => {
-    setRevealed(
-      revealedEvents?.reduce((acc, e) => {
-        acc.set(e.args[1], {
-          revealer: e.args[1],
-          valid: e.args[2],
-          rand: e.args[3],
-        });
-        return acc;
-      }, new Map<string, Reveal>()),
-    );
-  }, [revealedEvents]);
 
   useScaffoldEventSubscriber({
     contractName: "HalalGamble",
@@ -121,29 +137,6 @@ export const ActiveRoom = ({
       triggerMyRooms(prev => !prev);
     },
   });
-  useScaffoldEventSubscriber({
-    contractName: "HalalGamble",
-    eventName: "Revealed",
-    listener: (_roomNo, revealer, valid, randomNumber) => {
-      if (_roomNo.toString() != roomNo) return;
-      setRevealed(prev => {
-        prev.set(revealer, {
-          revealer: revealer,
-          valid: valid,
-          rand: randomNumber.toString(),
-        });
-        return prev;
-      });
-    },
-  });
-
-  // console.log(`@@@@@@@@@@@@ activeRoom: ${roomNo}`);
-  // console.log(`creator: ${creatorAddress}`);
-  // console.log(`fee: ${roomFee.toString()}`);
-  // console.log(`capacity: ${capacity}`);
-  // console.log(`participants: ${Array.from(participants)}`);
-  // console.log(`revealed count: ${Array.from((revealed || new Map()).keys()).length}`);
-  // console.log("@@@@@@@@@@@@");
 
   //////////////////////////////////////////
   /*********** Button Management **********/
@@ -151,12 +144,16 @@ export const ActiveRoom = ({
   const [disableAfterSuccess, setDisableAfterSuccess] = useState(false);
   let buttonText = "";
   let userJoinedRoom = false;
-  if (!isLoading)
-    if (currentAccount)
-      if (participants.includes(currentAccount)) {
+  if (currentAccount)
+    if (participants.includes(currentAccount)) {
+      if (!isLoading) {
         buttonText = "JOINED";
         userJoinedRoom = true;
-      } else buttonText = "JOIN";
+      } else userJoinedRoom = false;
+    } else {
+      userJoinedRoom = false;
+    }
+  else userJoinedRoom = false;
 
   const isRoomFull = Array.from(participants).length == capacity;
 
@@ -176,7 +173,6 @@ export const ActiveRoom = ({
               await writeTxn(joinRoom());
               setDisableAfterSuccess(true);
               triggerMyRooms(prev => !prev);
-              setRnd(Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
             } catch (e: any) {
               const message = getParsedEthersError(e);
               notification.error(message);

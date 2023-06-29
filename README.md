@@ -1,3 +1,19 @@
+...source of randomness is distributed...
+
+...other games like rps or ttt...
+
+...winner is dependent on valid reveals...
+...xor is calculated on-the-fly as people reveal...
+...no valid reveals no winner because last-man-attacks...
+
+...but can we prevent last man attacks entirely?...
+
+Current xor is put in the room display to emphasize that the on-chain randomness that we accumulate from users is totally simulatable off-chain. This simulation might yield intuition to the participants to realise fraudulent scenarios.
+
+Consider that a room of N participants is in the reveal phase, and M of N has already revealed their numbers. At that point we know who among the valid revealers will be the winner <u>if no more valid reveals are made</u>. The potential winner now can <u>bribe the N-M participants to perform an invalid reveal</u>. Like if one user has left to reveal, the winner can offer half of the prize to the last revealer and they can split.
+
+So even if we calculate the winner among valid revealers and forfeit the money staked by invalid revealers, there are still some **last man attack** situations making it harder to implement an iterative gambling application relying on a commit-reveal scheme.
+
 # 🏗 Scaffold-ETH 2
 
 🧪 An open-source, up-to-date toolkit for building decentralized applications (dapps) on the Ethereum blockchain. It's designed to make it easier for developers to create and deploy smart contracts and build user interfaces that interact with those contracts.

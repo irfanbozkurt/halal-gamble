@@ -127,6 +127,19 @@ const contracts = {
               type: "event",
             },
             {
+              inputs: [],
+              name: "REVEAL_EXPIRATION_PERIOD",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
               inputs: [
                 {
                   internalType: "uint256",
@@ -150,11 +163,6 @@ const contracts = {
                   internalType: "uint8",
                   name: "capacity",
                   type: "uint8",
-                },
-                {
-                  internalType: "uint256",
-                  name: "revealExpirationPeriod",
-                  type: "uint256",
                 },
                 {
                   internalType: "bytes32",
@@ -194,31 +202,12 @@ const contracts = {
                   type: "uint256",
                 },
               ],
-              name: "getInvalidRevealers",
+              name: "getCurrentXor",
               outputs: [
-                {
-                  internalType: "address[]",
-                  name: "",
-                  type: "address[]",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [
                 {
                   internalType: "uint256",
-                  name: "roomNo",
-                  type: "uint256",
-                },
-              ],
-              name: "getParticipants",
-              outputs: [
-                {
-                  internalType: "address[]",
                   name: "",
-                  type: "address[]",
+                  type: "uint256",
                 },
               ],
               stateMutability: "view",
@@ -257,6 +246,30 @@ const contracts = {
                 },
               ],
               name: "isActiveParticipant",
+              outputs: [
+                {
+                  internalType: "bool",
+                  name: "",
+                  type: "bool",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "roomNo",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "who",
+                  type: "address",
+                },
+              ],
+              name: "isParticipant",
               outputs: [
                 {
                   internalType: "bool",
@@ -349,11 +362,6 @@ const contracts = {
                 {
                   internalType: "uint256",
                   name: "startTime",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "revealExpirationPeriod",
                   type: "uint256",
                 },
                 {

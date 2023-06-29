@@ -1,30 +1,23 @@
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
-import { BigNumber, ethers } from "ethers";
-import { FunctionFragment } from "ethers/lib/utils.js";
-import { useEffectOnce, useLocalStorage } from "usehooks-ts";
-import { useAccount, useContractWrite, useNetwork } from "wagmi";
-import {
-  Address,
-  generateHalalHash,
-  getParsedContractFunctionArgs,
-  getParsedEthersError,
-} from "~~/components/scaffold-eth";
+import { useEffect, useState } from "react";
+import { ethers } from "ethers";
+import { useLocalStorage } from "usehooks-ts";
+import { useAccount, useContractRead, useNetwork } from "wagmi";
+import { Address, Balance, getParsedEthersError } from "~~/components/scaffold-eth";
 import {
   useScaffoldContractRead,
+  useScaffoldContractWrite,
   useScaffoldEventHistory,
   useScaffoldEventSubscriber,
-  useTransactor,
 } from "~~/hooks/scaffold-eth";
 import { Reveal, TMyRoomProps } from "~~/types/halalTypes";
-import { getTargetNetwork, notification, parseTxnValue } from "~~/utils/scaffold-eth";
+import { getTargetNetwork, notification } from "~~/utils/scaffold-eth";
 
 export const MyRoom = ({
   contractAddress,
+  getValidRevealersFn,
   abolishRoomFn,
-  revealFn,
-  triggerRevealExpiryFn,
+  getCurrentXorFn,
   roomNo,
-  creatorAddress,
   setMyRooms,
   roomFee,
   capacity,
@@ -33,44 +26,18 @@ export const MyRoom = ({
   const { address: currentAccount } = useAccount();
 
   /////////////////////////////////////////////
-  /*********** Get Participants ************/
+  /*********** Read Room Data ************/
   /////////////////////////////////////////////
 
-  const { data: participants } = useScaffoldContractRead({
+  const { data: participantCount } = useScaffoldContractRead({
     contractName: "HalalGamble",
-    functionName: "getParticipants",
+    functionName: "getCurrentParticipantCount",
     args: [ethers.BigNumber.from(roomNo)],
-  });
+  }) as { data: ethers.BigNumber };
 
-  /////////////////////////////////////////////
-  /*********** Handle Abolish Events ************/
-  /////////////////////////////////////////////
-  const [abolished, setAbolished] = useState<boolean>(false);
-  const { data: abolishedEvents } = useScaffoldEventHistory({
-    contractName: "HalalGamble",
-    eventName: "RoomAbolished",
-    fromBlock: Number(process.env.NEXT_PUBLIC_DEPLOY_BLOCK) || 0,
-    filters: {
-      roomNo: ethers.BigNumber.from(roomNo),
-    },
-    blockData: false,
-  });
-  useEffect(() => {
-    if (abolishedEvents && abolishedEvents.length > 0) setAbolished(true);
-  }, [abolishedEvents]);
-  useScaffoldEventSubscriber({
-    contractName: "HalalGamble",
-    eventName: "RoomAbolished",
-    listener: _roomNo => {
-      if (_roomNo.toString() != roomNo) return;
-      setAbolished(true);
-    },
-  });
-  if (abolished) return <>ROOM ABOLISHED. REFRESH PAGE</>;
-
-  //////////////////////////////////////////
+  ///////////////////////////////////////////
   /*********** Handle reveal events ********/
-  //////////////////////////////////////////
+  ///////////////////////////////////////////
   const { data: revealedEvents } = useScaffoldEventHistory({
     contractName: "HalalGamble",
     eventName: "Revealed",
@@ -112,68 +79,153 @@ export const MyRoom = ({
     },
   });
 
-  //////////////////////////////////////////
-  /*********** Handle reveal  *************/
-  //////////////////////////////////////////
+  const revealedCount = revealed ? Object.keys(revealed).length : 0;
+  const validRevealCount = revealed
+    ? Object.keys(revealed).reduce((acc, revealer) => {
+        if (revealed[revealer].valid == true) return acc + 1;
+        return acc;
+      }, 0)
+    : 0;
+  const invalidRevealCount = revealedCount - validRevealCount;
 
+  const { data: validRevealers, refetch: fetchValidRevealers } = useContractRead({
+    chainId: getTargetNetwork().id,
+    address: contractAddress,
+    abi: [getValidRevealersFn],
+    functionName: getValidRevealersFn.name,
+    args: [roomNo],
+    onError: error => {
+      notification.error(error.message);
+    },
+  }) as { data: string[]; refetch: any };
+  useEffect(() => {
+    fetchValidRevealers();
+  }, [validRevealCount, invalidRevealCount]);
+
+  ///////////////////////////////////////////
+  /*********** Read Latest XOR *************/
+  ///////////////////////////////////////////
+  const { data: xor, refetch: fetchXor } = useContractRead({
+    chainId: getTargetNetwork().id,
+    address: contractAddress,
+    abi: [getCurrentXorFn],
+    functionName: getCurrentXorFn.name,
+    args: [roomNo],
+    onError: error => {
+      notification.error(error.message);
+    },
+  }) as { data: string[]; refetch: any };
+  useEffect(() => {
+    fetchXor();
+  }, [validRevealCount, invalidRevealCount]);
+
+  ///////////////////////////////////////////
+  /******* Calculate current winner ********/
+  ///////////////////////////////////////////
+
+  const determineWinnerForCurrentStatusQuo = () => {
+    if (!validRevealers || validRevealers.length == 0 || validRevealCount == 0) return "__distribute__fees";
+    const winnerIndex = parseInt((BigInt((xor || 0).toString()) % BigInt(validRevealCount)).toString());
+    return (
+      <span>
+        <Address address={validRevealers[winnerIndex]} />
+      </span>
+    );
+  };
+  const [currentWinner, setCurrentWinner] = useState<any>(determineWinnerForCurrentStatusQuo());
+  useEffect(() => {
+    setCurrentWinner(determineWinnerForCurrentStatusQuo());
+  }, [validRevealCount]);
+
+  ///////////////////////////////////////////
+  /*********** Reveal tx handle ************/
+  ///////////////////////////////////////////
   const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
-  const [rnd] = useLocalStorage<number>(rndLocalKey, 0);
+  const rnd = localStorage.getItem(rndLocalKey);
 
-  // console.log("@@@@@@@@@@@@ myRoom");
+  const userRevelaedPreCheck = currentAccount && revealed ? Object.keys(revealed).includes(currentAccount) : false;
+  const [userRevealed, setUserRevealed] = useState<boolean>(userRevelaedPreCheck);
+  if (userRevelaedPreCheck != userRevealed) setUserRevealed(userRevelaedPreCheck);
+
+  let { writeAsync: reveal, isLoading: revealLoading } = useScaffoldContractWrite({
+    contractName: "HalalGamble",
+    functionName: "reveal",
+    args: [ethers.BigNumber.from(roomNo), ethers.BigNumber.from(rnd)],
+    blockConfirmations: 0,
+    onBlockConfirmation: () => {
+      setUserRevealed(true);
+    },
+  });
+  const { chain } = useNetwork();
+  const writeDisabled = !chain || chain?.id !== getTargetNetwork().id;
+
+  // console.log(`@@@@@@@@@@@@ myRoom with roomNo: ${roomNo}`);
   // console.log("rnd: " + rnd);
-  // console.log(`roomNo: ${roomNo}`);
   // console.log(`creator: ${creatorAddress}`);
   // console.log(`fee: ${roomFee.toString()}`);
   // console.log(`capacity: ${capacity}`);
   // console.log(`participants: ${participants}`);
-
-  /* set form */
-  // const [form] = useState<Record<string, any>>(() => {
-  //   return {
-  //     roomNo: roomNo,
-  //     hashRndNumber: currentAccount && generateHalalHash(currentAccount, rnd),
-  //   } as Record<string, any>;
-  // });
-  // const [txValue] = useState<string | BigNumber>(roomFee);
-  // const { chain } = useNetwork();
-  // const writeTxn = useTransactor();
-  // const writeDisabled = !chain || chain?.id !== getTargetNetwork().id;
-
-  // const { isLoading, writeAsync: joinRoom } = useContractWrite({
-  //   address: contractAddress,
-  //   functionName: joinRoomFn && joinRoomFn.name,
-  //   abi: joinRoomFn && [joinRoomFn],
-  //   args: getParsedContractFunctionArgs(form),
-  //   mode: "recklesslyUnprepared",
-  //   overrides: {
-  //     value: typeof txValue === "string" ? parseTxnValue(txValue) : txValue,
-  //   },
-  // });
+  // console.log(`revealed:`);
+  // console.log(revealed);
+  // console.log(`validRevealers: ${validRevealers as string[]}`);
 
   return (
     <div
-      className={`flex overflow-hidden h-20 px-3 rounded-3xl bg-gradient-to-r to-violet-500 from-fuchsia-500 border-primary`}
+      className={`min-w-fit flex flex-col overflow-hidden justify-around overflow-hidden h-48 px-3 rounded-3xl bg-violet-500 bg-opacity-10 border-primary`}
     >
-      {/* <button
-          className={`bg-orange-100 btn btn-sm ${isLoading ? "loading" : ""} bg`}
-          disabled={writeDisabled || isLoading || userJoinedRoom || isRoomFull}
+      <div className="w-full flex justify-between pt-2">
+        <div className="flex justify-start">
+          <span className="text-xl text-orange-100 text-center">_room {roomNo}</span>
+        </div>
+
+        <div className="flex justify-start">
+          <span className="text-xl text-orange-100 text-center">capacity: {capacity}</span>
+        </div>
+
+        {participantCount && (
+          <div className="flex justify-start">
+            <span className="text-xl text-orange-100 text-center">
+              💸 prize 💸: {ethers.utils.formatEther(participantCount.mul(ethers.BigNumber.from(roomFee)).toString())}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="w-11/12 flex justify-around pt-2">
+        <span className="text-xl text-orange-100">valid reveals: {validRevealCount}</span>
+        <span className="text-xl text-orange-100">invalid reveals: {invalidRevealCount}</span>
+      </div>
+      <div className="w-full flex flex-col justify-around pt-2">
+        <span className="text-xl text-orange-100 text-center">_current_xor_: {(xor || 0).toString()}</span>
+        <div className="flex justify-center gap-5">
+          <span className="text-xl text-orange-100 text-center">current winner:</span>
+          <div>{determineWinnerForCurrentStatusQuo()}</div>
+        </div>
+      </div>
+      <div className="w-full flex justify-between pt-2">
+        <span className="text-3xl text-orange-100">{rnd || "! rnd LOST !"}</span>
+        <button
+          className={`btn-sm ml-2`} // Modified (Removed "mr-10")
+          disabled={writeDisabled || userRevealed || revealLoading}
           onClick={async () => {
-            if (!joinRoom) return;
+            if (!reveal) return;
             try {
-              await writeTxn(joinRoom());
+              await reveal();
             } catch (e: any) {
               const message = getParsedEthersError(e);
               notification.error(message);
             }
           }}
         >
-          {!isLoading && (userJoinedRoom ? <> JOINED </> : isRoomFull ? <> FULL </> : <> JOIN </>)}
-        </button> */}
-
-      <span className="text-xl text-orange-100 text-center">
-        @@@ {revealed && Array.from(Object.keys(revealed)).length} @@@@
-      </span>
-      <div className="flex w-full justify-start"></div>
+          <span
+            className={`text-3xl ${
+              userRevealed ? "text-sky-100" : "text-orange-300 hover:text-lime-800 active:text-white"
+            }`}
+          >
+            {!revealLoading && !writeDisabled && (userRevealed ? <> REVEALED </> : <> REVEAL </>)}
+          </span>
+        </button>
+      </div>
+      <div className="w-full"></div> {/* Added an empty div to maintain the positioning */}
     </div>
   );
 };

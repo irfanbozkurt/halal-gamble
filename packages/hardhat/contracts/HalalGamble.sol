@@ -11,7 +11,6 @@ contract HalalGamble {
     uint8 capacity;
     //
     uint256 startTime;
-    uint256 revealExpirationPeriod;
     uint256 revealExpiresAt;
     uint256 endTime;
     //
@@ -37,21 +36,21 @@ contract HalalGamble {
   mapping(uint256 => Room) public rooms;
   uint256 public roomCount;
 
-  /* Getters for Arrays of struct, as their values are not returned via a rooms() call. */
-  function getParticipants(uint256 roomNo) external view returns (address[] memory) {
-    return rooms[roomNo].participants;
-  }
-
+  /* Getters for Arrays of struct */
   function getValidRevealers(uint256 roomNo) external view returns (address[] memory) {
     return rooms[roomNo].validRevealers;
   }
 
-  function getInvalidRevealers(uint256 roomNo) external view returns (address[] memory) {
-    return rooms[roomNo].invalidRevealers;
+  function getCurrentXor(uint256 roomNo) external view returns (uint256) {
+    return rooms[roomNo].xor;
   }
 
   function getCurrentParticipantCount(uint256 roomNo) external view returns (uint256) {
     return rooms[roomNo].participants.length;
+  }
+
+  function isParticipant(uint256 roomNo, address who) external view returns (bool) {
+    return rooms[roomNo].participantsMap[who];
   }
 
   function isActiveParticipant(uint256 roomNo, address who) external view returns (bool) {
@@ -61,19 +60,10 @@ contract HalalGamble {
 
   /* Business Logic */
 
-  function createRoom(
-    uint256 roomFee,
-    uint8 capacity,
-    uint256 revealExpirationPeriod,
-    bytes32 hashRndNumber
-  ) external payable {
+  function createRoom(uint256 roomFee, uint8 capacity, bytes32 hashRndNumber) external payable {
     require(roomFee > 0, "No one wants to play a free gambling game");
     require(msg.value >= roomFee, "Creator is the first player, so they must pay a roomFee");
     require(capacity > 1, "You need friends to play with");
-    require(
-      revealExpirationPeriod >= 3 minutes && revealExpirationPeriod <= 10 minutes,
-      "Expiration period can be [3, 10] mins"
-    );
 
     // Calculate room index
     uint256 roomNo = roomCount;
@@ -84,7 +74,6 @@ contract HalalGamble {
     rooms[roomNo].roomFee = roomFee;
     rooms[roomNo].capacity = capacity;
     rooms[roomNo].startTime = block.timestamp;
-    rooms[roomNo].revealExpirationPeriod = revealExpirationPeriod;
     rooms[roomNo].participants.push(msg.sender);
     rooms[roomNo].randHash[msg.sender] = hashRndNumber;
     rooms[roomNo].participantsMap[msg.sender] = true;
@@ -100,20 +89,15 @@ contract HalalGamble {
     require(msg.sender == rooms[roomNo].createdBy, "Only the creator can abolish");
     require(rooms[roomNo].participants.length < rooms[roomNo].capacity, "Cannot abolish after capacity is full");
 
-    // Refund people their money
-    uint256 N = rooms[roomNo].participants.length;
-    for (uint256 i = 0; i < N; i++) payable(rooms[roomNo].participants[i]).transfer(rooms[roomNo].roomFee);
+    _refund(roomNo); // Refund people their money
 
-    // Destroy record
-    delete rooms[roomNo];
+    delete rooms[roomNo]; // Destroy record
 
     emit RoomAbolished(roomNo);
   }
 
   function joinRoom(uint256 roomNo, bytes32 hashRndNumber) external payable {
     require(rooms[roomNo].participants.length != 0, "No such room");
-    console.log(msg.sender);
-    console.log(roomNo);
     require(!rooms[roomNo].participantsMap[msg.sender], "You already joined this room");
     require(rooms[roomNo].participants.length < rooms[roomNo].capacity, "Capacity full");
     uint256 fee = rooms[roomNo].roomFee;
@@ -123,8 +107,7 @@ contract HalalGamble {
     rooms[roomNo].randHash[msg.sender] = hashRndNumber;
     rooms[roomNo].participantsMap[msg.sender] = true;
 
-    // Pay back the surplus
-    if (msg.value > fee) payable(msg.sender).transfer(msg.value - fee);
+    if (msg.value > fee) payable(msg.sender).transfer(msg.value - fee); // Pay back the surplus
 
     emit EnterRoom(roomNo, msg.sender);
   }
@@ -136,12 +119,20 @@ contract HalalGamble {
 
     bool validReveal;
     if (keccak256(abi.encode(rndNumber, msg.sender)) == rooms[roomNo].randHash[msg.sender]) {
+      console.log("zurten VALID REVEAL BY:");
+      console.log(msg.sender);
+      console.log("number:");
+      console.log(rndNumber);
       validReveal = true;
 
       rooms[roomNo].xor ^= rndNumber;
       rooms[roomNo].revealStatus[msg.sender] = 2; // Valid reveal
       rooms[roomNo].validRevealers.push(msg.sender);
     } else {
+      console.log("zurten INVALID REVEAL BY:");
+      console.log(msg.sender);
+      console.log("number:");
+      console.log(rndNumber);
       rooms[roomNo].revealStatus[msg.sender] = 1; // Invalid reveal
       rooms[roomNo].invalidRevealers.push(msg.sender);
     }
@@ -149,27 +140,42 @@ contract HalalGamble {
     emit Revealed(roomNo, msg.sender, validReveal, rndNumber);
 
     uint256 totalReveals = rooms[roomNo].invalidRevealers.length + rooms[roomNo].validRevealers.length;
-    if (totalReveals == 1) rooms[roomNo].revealExpiresAt = block.timestamp + rooms[roomNo].revealExpirationPeriod;
-    else if (totalReveals == rooms[roomNo].capacity) _determineWinner(roomNo);
+    rooms[roomNo].revealExpiresAt = block.timestamp + REVEAL_EXPIRATION_PERIOD;
+    if (totalReveals == rooms[roomNo].capacity) _determineWinnerAndPay(roomNo);
   }
+
+  uint256 public constant REVEAL_EXPIRATION_PERIOD = 3 minutes;
 
   function triggerRevealExpiry(uint256 roomNo) external {
     require(rooms[roomNo].revealExpiresAt > block.timestamp, "Didn't expire yet");
-    _determineWinner(roomNo);
+    _determineWinnerAndPay(roomNo);
   }
 
-  function _determineWinner(uint256 roomNo) internal {
+  /* 
+    Refund to all participants in cases of no valid reveals, determine a winner
+    and pay them in other ones.
+  */
+  function _determineWinnerAndPay(uint256 roomNo) internal {
     require(rooms[roomNo].winner == address(0), "Winner of room already collected prize");
     uint256 sampleSize = rooms[roomNo].validRevealers.length;
-    require(sampleSize > 0, "No valid reveals for given HalalGamble no");
 
-    uint256 winnerIndex = rooms[roomNo].xor % sampleSize;
+    if (sampleSize > 0) {
+      uint256 winnerIndex = rooms[roomNo].xor % sampleSize;
 
-    rooms[roomNo].winner = rooms[roomNo].validRevealers[winnerIndex];
-    rooms[roomNo].prize = rooms[roomNo].capacity * rooms[roomNo].roomFee;
+      rooms[roomNo].winner = rooms[roomNo].validRevealers[winnerIndex];
+      rooms[roomNo].prize = rooms[roomNo].capacity * rooms[roomNo].roomFee;
 
-    payable(rooms[roomNo].winner).transfer(rooms[roomNo].prize);
+      payable(rooms[roomNo].winner).transfer(rooms[roomNo].prize);
 
-    emit RoomEnded(roomNo, rooms[roomNo].winner, rooms[roomNo].prize);
+      emit RoomEnded(roomNo, rooms[roomNo].winner, rooms[roomNo].prize);
+    } else {
+      _refund(roomNo);
+      emit RoomEnded(roomNo, address(0), rooms[roomNo].roomFee);
+    }
+  }
+
+  function _refund(uint256 roomNo) internal {
+    for (uint256 i = 0; i < rooms[roomNo].participants.length; i++)
+      payable(rooms[roomNo].participants[i]).transfer(rooms[roomNo].roomFee);
   }
 }

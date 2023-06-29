@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { TransactionReceipt } from "@ethersproject/abstract-provider";
 import { BigNumber } from "ethers";
-import { FunctionFragment } from "ethers/lib/utils";
+import { FunctionFragment, ParamType } from "ethers/lib/utils";
 import { useLocalStorage } from "usehooks-ts";
 import { useAccount, useContractWrite, useNetwork, useWaitForTransaction } from "wagmi";
 import {
@@ -14,11 +14,9 @@ import {
 import { useScaffoldContractRead, useTransactor } from "~~/hooks/scaffold-eth";
 import { getTargetNetwork, notification, parseTxnValue } from "~~/utils/scaffold-eth";
 
-const getInitialFormState = (createRoomFn: FunctionFragment, rnd: number, account?: string) =>
+const getInitialFormState = (createRoomFn: FunctionFragment) =>
   createRoomFn.inputs.reduce((acc, input, inputIndex) => {
-    let val = "";
-    if (input.name == "hashRndNumber" && account) val = generateHalalHash(account, rnd);
-    acc[getFunctionInputKey(createRoomFn, input, inputIndex)] = val;
+    acc[getFunctionInputKey(createRoomFn, input, inputIndex)] = "";
     return acc;
   }, {} as Record<string, any>);
 
@@ -43,17 +41,9 @@ export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFor
   const roomNo = roomNoBignum?.toString();
 
   /////////////////////////////////////////////
-  /****************** RND ********************/
-  /////////////////////////////////////////////
-  const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
-  const [rnd, setRnd] = useLocalStorage<number>(rndLocalKey, Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
-  const renewRnd = () => setRnd(Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)));
-  if (!rnd) renewRnd();
-
-  /////////////////////////////////////////////
   /*********** Create room tx prepare **********/
   /////////////////////////////////////////////
-  const [form, setForm] = useState<Record<string, any>>(() => getInitialFormState(createRoomFn, rnd, currentAccount));
+  const [form, setForm] = useState<Record<string, any>>(() => getInitialFormState(createRoomFn));
   const [txValue, setTxValue] = useState<string | BigNumber>("");
   const { chain } = useNetwork();
   const writeTxn = useTransactor();
@@ -74,7 +64,6 @@ export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFor
       value: typeof txValue === "string" ? parseTxnValue(txValue) : txValue,
     },
   });
-
   const [, setDisplayedTxResult] = useState<TransactionReceipt>();
   const { data: txResult } = useWaitForTransaction({
     hash: result?.hash,
@@ -82,6 +71,57 @@ export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFor
   useEffect(() => {
     setDisplayedTxResult(txResult);
   }, [txResult]);
+
+  /////////////////////////////////////////////
+  /****************** RND ********************/
+  /////////////////////////////////////////////
+
+  useEffect(() => {
+    if (!roomNo) {
+      console.log(`RETURNING FROM useEffect BECAUSE roomNo is ${roomNo}`);
+      return;
+    }
+
+    const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
+    const fromStorage = localStorage.getItem(rndLocalKey);
+    if (fromStorage) {
+      console.log(`RANDOM NUMBER FOUND IN STORAGE FOR GIVEN ROOMNO AND ACCOUNT: ${fromStorage}`);
+
+      setForm(prev => {
+        const hashRndNumberInputAndIndex = createRoomFn.inputs
+          .map((inp, idx) => [inp.name == "hashRndNumber" ? inp : undefined, idx])
+          .filter(([inp]) => inp)[0];
+        prev[
+          getFunctionInputKey(
+            createRoomFn,
+            hashRndNumberInputAndIndex[0] as ParamType,
+            hashRndNumberInputAndIndex[1] as number,
+          )
+        ] = generateHalalHash(parseInt(fromStorage), currentAccount!, roomNo);
+        return prev;
+      });
+    } else {
+      const newRandStr = Math.trunc(Math.random() * (Number.MAX_SAFE_INTEGER - 1)).toString();
+      const newRand = parseInt(newRandStr);
+
+      console.log(`COULD NOT FIND RANDOM NUMBER IN STORAGE FOR GIVEN KEY. PUTTING: ${newRandStr}`);
+
+      localStorage.setItem(rndLocalKey, newRandStr);
+      setForm(prev => {
+        const hashRndNumberInputAndIndex = createRoomFn.inputs
+          .map((inp, idx) => [inp.name == "hashRndNumber" ? inp : undefined, idx])
+          .filter(([inp]) => inp)[0];
+        prev[
+          getFunctionInputKey(
+            createRoomFn,
+            hashRndNumberInputAndIndex[0] as ParamType,
+            hashRndNumberInputAndIndex[1] as number,
+          )
+        ] = generateHalalHash(newRand, currentAccount!, roomNo);
+        return prev;
+      });
+    }
+  }, [roomNo, currentAccount]);
 
   // TODO use `useMemo` to optimize also update in ReadOnlyFunctionForm
   const inputs = createRoomFn.inputs.map((input, inputIndex) => {
@@ -124,8 +164,9 @@ export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFor
             onClick={async () => {
               if (!createRoom) return;
               try {
+                console.log("~~~~~ SENDING createRoom TX WITH following form:");
+                console.log(form);
                 await writeTxn(createRoom());
-                renewRnd();
               } catch (e: any) {
                 const message = getParsedEthersError(e);
                 notification.error(message);

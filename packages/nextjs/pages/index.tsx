@@ -6,6 +6,7 @@ import { useAccount, useContract, useProvider } from "wagmi";
 import { ActiveRoomList } from "~~/components/ActiveRoomList";
 import { MetaHeader } from "~~/components/MetaHeader";
 import { MyRoom } from "~~/components/MyRoom";
+import { MyPastRoom } from "~~/components/PastRoom";
 import { getAllContractFunctions } from "~~/components/scaffold-eth";
 import { CreateRoomForm } from "~~/components/scaffold-eth/Contract/CreateRoomForm";
 import {
@@ -14,8 +15,7 @@ import {
   useScaffoldEventHistory,
   useScaffoldEventSubscriber,
 } from "~~/hooks/scaffold-eth";
-import { TActiveRoomProps, TMyCandidateRoom } from "~~/types/halalTypes";
-import { TEndedRoomProps, TRoomProps } from "~~/types/halalTypes";
+import { TActiveRoomProps, TEndedRoomProps, TMyCandidateRoom, TRoomProps } from "~~/types/halalTypes";
 import { getContractNames } from "~~/utils/scaffold-eth/contractNames";
 
 const Rooms: NextPage = () => {
@@ -113,6 +113,7 @@ const Rooms: NextPage = () => {
     listener: (roomNo, creator, roomFee, capacity) => {
       setAllRooms(prev => {
         const newRoomNo = roomNo.toString();
+        if (!prev) prev = [];
         if (prev.some(e => e.roomNo == newRoomNo)) return prev;
 
         const newRoom = {
@@ -145,6 +146,7 @@ const Rooms: NextPage = () => {
     listener: (roomNo, winner, prize) => {
       setEndedRooms(prev => {
         const endedRoomNo = roomNo.toString();
+        if (!prev) prev = [];
         if (prev.some(e => e.roomNo == endedRoomNo)) return prev;
 
         const endedRoom = {
@@ -199,6 +201,36 @@ const Rooms: NextPage = () => {
     run();
   }, [currentAccount, activeRooms, myRoomTrigger]);
 
+  //////////////////////////////////////////
+  /************ My Past Rooms *************/
+  //////////////////////////////////////////
+  const [myPastRooms, setMyPastRooms] = useState<TRoomProps[]>([]);
+  const [myPastRoomsTrigger, setMyPastRoomsTrigger] = useState<boolean>(false);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!contract) return;
+      const tempContr = contract.attach(contract.address);
+
+      const myPastRoomNos = new Set<string>(
+        (
+          await Promise.all(
+            (endedRooms || []).map(async room => {
+              const isParticipant = await (tempContr.callStatic as { isParticipant: any }).isParticipant(
+                room.roomNo,
+                currentAccount,
+              );
+              return isParticipant ? room.roomNo : undefined;
+            }),
+          )
+        ).filter(room => room != undefined) as string[],
+      );
+
+      setMyPastRooms((endedRooms || []).filter(room => myPastRoomNos.has(room.roomNo)));
+    };
+    run();
+  }, [currentAccount, roomEndedEvents, endedRooms, myPastRoomsTrigger]);
+
   return (
     <>
       <MetaHeader />
@@ -237,7 +269,7 @@ const Rooms: NextPage = () => {
 
             <div className="w-full flex flex-col items-center">
               <span className="text-6xl text-orange-100 text-center pb-10">my rooms</span>
-              <div className="grid grid-cols-2 gap-2 w-11/12">
+              <div className="flex flex-col w-3/4 gap-2 w-11/12">
                 {myRooms.map(
                   room =>
                     currentAccount && (
@@ -246,8 +278,8 @@ const Rooms: NextPage = () => {
                         contractAddress={contract.address}
                         setMyRooms={setMyRooms}
                         abolishRoomFn={contractFunctions.find(f => f.name == "abolishRoom")!}
-                        revealFn={contractFunctions.find(f => f.name == "reveal")!}
-                        triggerRevealExpiryFn={contractFunctions.find(f => f.name == "triggerRevealExpiry")!}
+                        getValidRevealersFn={contractFunctions.find(f => f.name == "getValidRevealers")!}
+                        getCurrentXorFn={contractFunctions.find(f => f.name == "getCurrentXor")!}
                         roomNo={room.roomNo}
                         creatorAddress={room.creatorAddress}
                         roomFee={room.roomFee}
@@ -255,7 +287,26 @@ const Rooms: NextPage = () => {
                       />
                     ),
                 )}
-                {/* <div className="flex items-center justify-center">AAAA</div> */}
+              </div>
+            </div>
+
+            <hr className="w-11/12 my-10 h-0.5 bg-neutral-800 opacity-10" />
+
+            <div className="w-full flex flex-col items-center pb-20">
+              <span className="text-6xl text-orange-100 text-center pb-10">my past rooms</span>
+              <div className="flex flex-col w-3/4 gap-2 w-11/12">
+                {myPastRooms.map(
+                  room =>
+                    currentAccount && (
+                      <MyPastRoom
+                        key={room.roomNo}
+                        roomNo={room.roomNo}
+                        creatorAddress={room.creatorAddress}
+                        roomFee={room.roomFee}
+                        capacity={room.capacity}
+                      />
+                    ),
+                )}
               </div>
             </div>
           </>

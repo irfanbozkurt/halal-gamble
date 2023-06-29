@@ -3,7 +3,7 @@ import { FunctionFragment } from "ethers/lib/utils.js";
 
 export type TRoomProps = {
   roomNo: string;
-  creatorAddress: string;
+  creatorAddress?: string;
   roomFee: string;
   capacity: number;
 };
@@ -11,7 +11,7 @@ export type TRoomProps = {
 export type TActiveRoomProps = TRoomProps & {
   participants?: string[];
   contractAddress?: string;
-  joinRoomFn?: FunctionFragment;
+  joinRoomFn: FunctionFragment;
   triggerMyRooms: (value: SetStateAction<boolean>) => void;
 };
 
@@ -23,9 +23,9 @@ export type TMyCandidateRoom = TRoomProps & {
 export type TMyRoomProps = TRoomProps & {
   setMyRooms: Dispatch<SetStateAction<TMyCandidateRoom[]>>;
   contractAddress: string;
+  getValidRevealersFn: FunctionFragment;
   abolishRoomFn: FunctionFragment;
-  revealFn: FunctionFragment;
-  triggerRevealExpiryFn: FunctionFragment;
+  getCurrentXorFn: FunctionFragment;
 };
 
 export type Reveal = {
