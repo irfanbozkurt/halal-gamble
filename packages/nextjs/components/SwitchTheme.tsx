@@ -3,12 +3,12 @@ import { useDarkMode, useIsMounted } from "usehooks-ts";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
 
 export const SwitchTheme = ({ className }: { className?: string }) => {
-  const { isDarkMode, toggle } = useDarkMode();
+  const { isDarkMode, toggle } = useDarkMode(true);
   const isMounted = useIsMounted();
 
   useEffect(() => {
     const body = document.body;
-    body.setAttribute("data-theme", isDarkMode ? "scaffoldEthDark" : "scaffoldEth");
+    body.setAttribute("data-theme", isDarkMode ? "scaffoldEthDark" : "scaffoldEthDark");
   }, [isDarkMode]);
 
   return (
@@ -18,7 +18,7 @@ export const SwitchTheme = ({ className }: { className?: string }) => {
         type="checkbox"
         className="toggle toggle-primary bg-primary"
         onChange={toggle}
-        checked={isDarkMode}
+        checked={false}
       />
       {isMounted() && (
         <label htmlFor="theme-toggle" className={`swap swap-rotate ${!isDarkMode ? "swap-active" : ""}`}>

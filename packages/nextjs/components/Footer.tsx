@@ -1,7 +1,7 @@
+import { SwitchTheme } from "./SwitchTheme";
 import { hardhat } from "wagmi/chains";
 import { CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/outline";
-import { SwitchTheme } from "~~/components/SwitchTheme";
 import { Faucet } from "~~/components/scaffold-eth";
 import { useGlobalState } from "~~/services/store/store";
 import { getTargetNetwork } from "~~/utils/scaffold-eth";
@@ -25,7 +25,9 @@ export const Footer = () => {
             )}
             {getTargetNetwork().id === hardhat.id && <Faucet />}
           </div>
-          <SwitchTheme className="pointer-events-auto" />
+          <div style={{ display: "none" }}>
+            <SwitchTheme className="pointer-events-auto" />
+          </div>
         </div>
       </div>
       <div className="w-full">
