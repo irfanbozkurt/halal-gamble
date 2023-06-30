@@ -159,37 +159,22 @@ export const MyRoom = ({
   const { chain } = useNetwork();
   const writeDisabled = !chain || chain?.id !== getTargetNetwork().id;
 
-  // console.log(`@@@@@@@@@@@@ myRoom with roomNo: ${roomNo}`);
-  // console.log("rnd: " + rnd);
-  // console.log(`creator: ${creatorAddress}`);
-  // console.log(`fee: ${roomFee.toString()}`);
-  // console.log(`capacity: ${capacity}`);
-  // console.log(`participants: ${participants}`);
-  // console.log(`revealed:`);
-  // console.log(revealed);
-  // console.log(`validRevealers: ${validRevealers as string[]}`);
-
   return (
     <div
-      className={`min-w-fit flex flex-col overflow-hidden justify-around overflow-hidden h-48 px-3 rounded-3xl bg-violet-500 bg-opacity-10 border-primary`}
+      className={`min-w-fit flex flex-col overflow-hidden justify-around overflow-hidden h-48 px-3 rounded-3xl shadow-lg bg-gradient-to-r from-amber-900 via-yellow-900 to-amber-800`}
     >
       <div className="w-full flex justify-between pt-2">
-        <div className="flex justify-start">
-          <span className="text-xl text-orange-100 text-center">_room {roomNo}</span>
-        </div>
+        <span className="text-xl text-orange-100 text-center">_room {roomNo}</span>
 
-        <div className="flex justify-start">
-          <span className="text-xl text-orange-100 text-center">capacity: {capacity}</span>
-        </div>
+        <span className="text-xl text-orange-100 text-center">capacity: {capacity}</span>
 
         {participantCount && (
-          <div className="flex justify-start">
-            <span className="text-xl text-orange-100 text-center">
-              💸 prize 💸: {ethers.utils.formatEther(participantCount.mul(ethers.BigNumber.from(roomFee)).toString())}
-            </span>
-          </div>
+          <span className="text-xl text-orange-100 text-center">
+            💸 {ethers.utils.formatEther(participantCount.mul(ethers.BigNumber.from(roomFee)).toString())} 💸
+          </span>
         )}
       </div>
+      <hr className="w-11/12 bg-neutral-800 opacity-10" />
       <div className="w-11/12 flex justify-around pt-2">
         <span className="text-xl text-orange-100">valid reveals: {validRevealCount}</span>
         <span className="text-xl text-orange-100">invalid reveals: {invalidRevealCount}</span>
@@ -197,7 +182,7 @@ export const MyRoom = ({
       <div className="w-full flex flex-col justify-around pt-2">
         <span className="text-xl text-orange-100 text-center">_current_xor_: {(xor || 0).toString()}</span>
         <div className="flex justify-center gap-5">
-          <span className="text-xl text-orange-100 text-center">current winner:</span>
+          <span className="text-xl text-orange-100 text-center">current 👑:</span>
           <div>{determineWinnerForCurrentStatusQuo()}</div>
         </div>
       </div>

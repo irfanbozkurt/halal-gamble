@@ -93,6 +93,9 @@ module.exports = {
       fontFamily: {
         "bai-jamjuree": ["Bai Jamjuree", "sans-serif"],
       },
+      backgroundImage: {
+        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
+      },
       keyframes: {
         grow: {
           "0%": {

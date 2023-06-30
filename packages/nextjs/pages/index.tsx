@@ -77,7 +77,7 @@ const Rooms: NextPage = () => {
         } as TActiveRoomProps;
       }) as TActiveRoomProps[],
     );
-  }, [roomCreatedEvents]);
+  }, [roomCreatedEvents, roomAbolishedEvents]);
 
   useEffect(() => {
     setAbolishedRoomIds(new Set(roomAbolishedEvents?.map(e => e.args[0].toString()) as string[]));
@@ -204,7 +204,7 @@ const Rooms: NextPage = () => {
   //////////////////////////////////////////
   /************ My Past Rooms *************/
   //////////////////////////////////////////
-  const [myPastRooms, setMyPastRooms] = useState<TRoomProps[]>([]);
+  const [myPastRooms, setMyPastRooms] = useState<TEndedRoomProps[]>([]);
   const [myPastRoomsTrigger, setMyPastRoomsTrigger] = useState<boolean>(false);
 
   useEffect(() => {
@@ -226,7 +226,7 @@ const Rooms: NextPage = () => {
         ).filter(room => room != undefined) as string[],
       );
 
-      setMyPastRooms((endedRooms || []).filter(room => myPastRoomNos.has(room.roomNo)));
+      setMyPastRooms((endedRooms || []).filter(room => myPastRoomNos.has(room.roomNo)) as TEndedRoomProps[]);
     };
     run();
   }, [currentAccount, roomEndedEvents, endedRooms, myPastRoomsTrigger]);
@@ -268,7 +268,7 @@ const Rooms: NextPage = () => {
             <hr className="w-11/12 my-10 h-0.5 bg-neutral-800 opacity-10" />
 
             <div className="w-full flex flex-col items-center">
-              <span className="text-6xl text-orange-100 text-center pb-10">my rooms</span>
+              <span className="text-6xl text-orange-100 text-center pb-10">my live rooms</span>
               <div className="flex flex-col w-3/4 gap-2 w-11/12">
                 {myRooms.map(
                   room =>
@@ -295,18 +295,7 @@ const Rooms: NextPage = () => {
             <div className="w-full flex flex-col items-center pb-20">
               <span className="text-6xl text-orange-100 text-center pb-10">my past rooms</span>
               <div className="flex flex-col w-3/4 gap-2 w-11/12">
-                {myPastRooms.map(
-                  room =>
-                    currentAccount && (
-                      <MyPastRoom
-                        key={room.roomNo}
-                        roomNo={room.roomNo}
-                        creatorAddress={room.creatorAddress}
-                        roomFee={room.roomFee}
-                        capacity={room.capacity}
-                      />
-                    ),
-                )}
+                {myPastRooms.map(room => currentAccount && <MyPastRoom roomNo={room.roomNo} />)}
               </div>
             </div>
           </>

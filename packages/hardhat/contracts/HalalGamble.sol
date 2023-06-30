@@ -119,20 +119,14 @@ contract HalalGamble {
 
     bool validReveal;
     if (keccak256(abi.encode(rndNumber, msg.sender)) == rooms[roomNo].randHash[msg.sender]) {
-      console.log("zurten VALID REVEAL BY:");
-      console.log(msg.sender);
-      console.log("number:");
-      console.log(rndNumber);
+      console.log("VALID REVEAL BY:", msg.sender, " number ", rndNumber);
       validReveal = true;
 
       rooms[roomNo].xor ^= rndNumber;
       rooms[roomNo].revealStatus[msg.sender] = 2; // Valid reveal
       rooms[roomNo].validRevealers.push(msg.sender);
     } else {
-      console.log("zurten INVALID REVEAL BY:");
-      console.log(msg.sender);
-      console.log("number:");
-      console.log(rndNumber);
+      console.log("INVALID REVEAL BY:", msg.sender, " number ", rndNumber);
       rooms[roomNo].revealStatus[msg.sender] = 1; // Invalid reveal
       rooms[roomNo].invalidRevealers.push(msg.sender);
     }
@@ -172,6 +166,8 @@ contract HalalGamble {
       _refund(roomNo);
       emit RoomEnded(roomNo, address(0), rooms[roomNo].roomFee);
     }
+
+    rooms[roomNo].endTime = block.timestamp;
   }
 
   function _refund(uint256 roomNo) internal {
