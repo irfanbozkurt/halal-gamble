@@ -15,10 +15,9 @@ import { getTargetNetwork, notification } from "~~/utils/scaffold-eth";
 export const MyRoom = ({
   contractAddress,
   getValidRevealersFn,
-  abolishRoomFn,
+  setFetchTrigger,
   getCurrentXorFn,
   roomNo,
-  setMyRooms,
   roomFee,
   capacity,
 }: TMyRoomProps) => {
@@ -26,7 +25,7 @@ export const MyRoom = ({
   const { address: currentAccount } = useAccount();
 
   /////////////////////////////////////////////
-  /*********** Read Room Data ************/
+  /*********** Read Participant count ********/
   /////////////////////////////////////////////
 
   const { data: participantCount } = useScaffoldContractRead({
@@ -57,6 +56,7 @@ export const MyRoom = ({
           revealer: e.args[1],
           valid: e.args[2],
           rand: e.args[3],
+          newExpiry: e.args[4].toString(),
         };
         return acc;
       }, {}),
@@ -66,13 +66,14 @@ export const MyRoom = ({
   useScaffoldEventSubscriber({
     contractName: "HalalGamble",
     eventName: "Revealed",
-    listener: (_roomNo, revealer, valid, randomNumber) => {
+    listener: (_roomNo, revealer, valid, randomNumber, newExpiry) => {
       if (_roomNo.toString() != roomNo) return;
       setRevealed(prev => {
         prev[revealer] = {
           revealer: revealer,
           valid: valid,
           rand: randomNumber.toString(),
+          newExpiry: newExpiry.toString(),
         };
         return prev;
       });
@@ -103,8 +104,32 @@ export const MyRoom = ({
   }, [validRevealCount, invalidRevealCount]);
 
   ///////////////////////////////////////////
+  /*********** Reveal tx handle ************/
+  ///////////////////////////////////////////
+  const { chain } = useNetwork();
+  const writeDisabled = !chain || chain?.id !== getTargetNetwork().id;
+
+  const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
+  const rnd = localStorage.getItem(rndLocalKey);
+
+  const userRevelaedPreCheck = currentAccount && revealed ? Object.keys(revealed).includes(currentAccount) : false;
+  const [userRevealed, setUserRevealed] = useState<boolean>(userRevelaedPreCheck);
+  if (userRevelaedPreCheck != userRevealed) setUserRevealed(userRevelaedPreCheck);
+
+  let { writeAsync: reveal, isLoading: revealLoading } = useScaffoldContractWrite({
+    contractName: "HalalGamble",
+    functionName: "reveal",
+    args: [ethers.BigNumber.from(roomNo), ethers.BigNumber.from(rnd)],
+    blockConfirmations: 0,
+    onBlockConfirmation: () => {
+      setUserRevealed(true);
+    },
+  });
+
+  ///////////////////////////////////////////
   /*********** Read Latest XOR *************/
   ///////////////////////////////////////////
+
   const { data: xor, refetch: fetchXor } = useContractRead({
     chainId: getTargetNetwork().id,
     address: contractAddress,
@@ -132,32 +157,32 @@ export const MyRoom = ({
       </span>
     );
   };
-  const [currentWinner, setCurrentWinner] = useState<any>(determineWinnerForCurrentStatusQuo());
-  useEffect(() => {
-    setCurrentWinner(determineWinnerForCurrentStatusQuo());
-  }, [validRevealCount]);
 
-  ///////////////////////////////////////////
-  /*********** Reveal tx handle ************/
-  ///////////////////////////////////////////
-  const rndLocalKey = currentAccount ? `${roomNo}_${currentAccount}` : "";
-  const rnd = localStorage.getItem(rndLocalKey);
+  /////////////////////////////////
+  /******* Handle abolish ********/
+  /////////////////////////////////
 
-  const userRevelaedPreCheck = currentAccount && revealed ? Object.keys(revealed).includes(currentAccount) : false;
-  const [userRevealed, setUserRevealed] = useState<boolean>(userRevelaedPreCheck);
-  if (userRevelaedPreCheck != userRevealed) setUserRevealed(userRevelaedPreCheck);
+  const revealExpiresAt =
+    revealed && Object.keys(revealed).length > 0
+      ? parseInt(
+          Object.values(revealed).sort((a, b) => {
+            if (BigInt(a.newExpiry) > BigInt(b.newExpiry)) return -1;
+            if (BigInt(a.newExpiry) < BigInt(b.newExpiry)) return 1;
+            return 0;
+          })[0]["newExpiry"],
+        )
+      : Number.MAX_SAFE_INTEGER;
+  const now = Math.trunc(Date.now() / 1000);
 
-  let { writeAsync: reveal, isLoading: revealLoading } = useScaffoldContractWrite({
+  let { writeAsync: triggerRevealExpiry } = useScaffoldContractWrite({
     contractName: "HalalGamble",
-    functionName: "reveal",
-    args: [ethers.BigNumber.from(roomNo), ethers.BigNumber.from(rnd)],
+    functionName: "triggerRevealExpiry",
+    args: [ethers.BigNumber.from(roomNo)],
     blockConfirmations: 0,
     onBlockConfirmation: () => {
-      setUserRevealed(true);
+      setFetchTrigger(prev => !prev);
     },
   });
-  const { chain } = useNetwork();
-  const writeDisabled = !chain || chain?.id !== getTargetNetwork().id;
 
   return (
     <div
@@ -188,8 +213,26 @@ export const MyRoom = ({
       </div>
       <div className="w-full flex justify-between pt-2">
         <span className="text-3xl text-orange-100">{rnd || "! rnd LOST !"}</span>
+
         <button
-          className={`btn-sm ml-2`} // Modified (Removed "mr-10")
+          style={{ display: `${revealExpiresAt && now < revealExpiresAt ? "none" : "block"}` }}
+          className={`btn-sm ml-2`}
+          disabled={writeDisabled}
+          onClick={async () => {
+            if (!triggerRevealExpiry) return;
+            try {
+              triggerRevealExpiry();
+            } catch (e: any) {
+              const message = getParsedEthersError(e);
+              notification.error(message);
+            }
+          }}
+        >
+          <span className={`text-3xl text-red-300 active:text-red-400`}>FINISH GAME</span>
+        </button>
+
+        <button
+          className={`btn-sm ml-2`}
           disabled={writeDisabled || userRevealed || revealLoading}
           onClick={async () => {
             if (!reveal) return;
@@ -203,7 +246,7 @@ export const MyRoom = ({
         >
           <span
             className={`text-3xl ${
-              userRevealed ? "text-sky-100" : "text-orange-300 hover:text-lime-800 active:text-white"
+              userRevealed ? "text-blue-300" : "text-orange-300 hover:text-lime-800 active:text-white"
             }`}
           >
             {!revealLoading && !writeDisabled && (userRevealed ? <> REVEALED </> : <> REVEAL </>)}

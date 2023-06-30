@@ -5,7 +5,7 @@ const contracts = {
       name: "localhost",
       contracts: {
         HalalGamble: {
-          address: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+          address: "0x59b670e9fA9D0A427751Af201D676719a970857b",
           abi: [
             {
               anonymous: false,
@@ -51,6 +51,12 @@ const contracts = {
                   indexed: false,
                   internalType: "uint256",
                   name: "randomNumber",
+                  type: "uint256",
+                },
+                {
+                  indexed: false,
+                  internalType: "uint256",
+                  name: "nexRevealExpiry",
                   type: "uint256",
                 },
               ],

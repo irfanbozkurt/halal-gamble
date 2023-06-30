@@ -65,6 +65,7 @@ const Rooms: NextPage = () => {
   const [abolishedRoomIds, setAbolishedRoomIds] = useState<Set<string>>(new Set());
   const [endedRooms, setEndedRooms] = useState<TRoomProps[]>([]);
   const [activeRooms, setActiveRooms] = useState<TActiveRoomProps[]>([]);
+  const [, setFetchTrigger] = useState(false);
 
   useEffect(() => {
     setAllRooms(
@@ -274,10 +275,9 @@ const Rooms: NextPage = () => {
                   room =>
                     currentAccount && (
                       <MyRoom
+                        setFetchTrigger={setFetchTrigger}
                         key={room.roomNo}
                         contractAddress={contract.address}
-                        setMyRooms={setMyRooms}
-                        abolishRoomFn={contractFunctions.find(f => f.name == "abolishRoom")!}
                         getValidRevealersFn={contractFunctions.find(f => f.name == "getValidRevealers")!}
                         getCurrentXorFn={contractFunctions.find(f => f.name == "getCurrentXor")!}
                         roomNo={room.roomNo}

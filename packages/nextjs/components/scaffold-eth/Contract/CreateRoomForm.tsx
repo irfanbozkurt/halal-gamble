@@ -164,9 +164,7 @@ export const CreateRoomForm = ({ createRoomFn, contractAddress }: TCreateRoomFor
             onClick={async () => {
               if (!createRoom) return;
               try {
-                console.log("~~~~~ SENDING createRoom TX WITH following form:");
-                console.log(form);
-                await writeTxn(createRoom());
+                writeTxn(createRoom());
               } catch (e: any) {
                 const message = getParsedEthersError(e);
                 notification.error(message);

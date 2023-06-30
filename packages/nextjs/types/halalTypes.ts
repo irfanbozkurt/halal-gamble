@@ -21,10 +21,9 @@ export type TMyCandidateRoom = TRoomProps & {
 };
 
 export type TMyRoomProps = TRoomProps & {
-  setMyRooms: Dispatch<SetStateAction<TMyCandidateRoom[]>>;
+  setFetchTrigger: Dispatch<SetStateAction<boolean>>;
   contractAddress: string;
   getValidRevealersFn: FunctionFragment;
-  abolishRoomFn: FunctionFragment;
   getCurrentXorFn: FunctionFragment;
 };
 
@@ -32,6 +31,7 @@ export type Reveal = {
   revealer: string;
   valid: boolean;
   rand: string;
+  newExpiry: string;
 };
 
 export type TEndedRoomProps = TRoomProps & {

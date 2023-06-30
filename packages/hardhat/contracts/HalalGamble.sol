@@ -30,11 +30,19 @@ contract HalalGamble {
   event RoomCreated(uint256 indexed roomNo, address indexed creator, uint256 roomFee, uint8 capacity);
   event RoomAbolished(uint256 indexed roomNo);
   event EnterRoom(uint256 indexed roomNo, address indexed entrar);
-  event Revealed(uint256 indexed roomNo, address indexed revealer, bool valid, uint256 randomNumber);
+  event Revealed(
+    uint256 indexed roomNo,
+    address indexed revealer,
+    bool valid,
+    uint256 randomNumber,
+    uint256 nexRevealExpiry
+  );
   event RoomEnded(uint256 indexed roomNo, address indexed winner, uint256 prize);
 
   mapping(uint256 => Room) public rooms;
   uint256 public roomCount;
+
+  uint256 public constant REVEAL_EXPIRATION_PERIOD = 3 minutes;
 
   /* Getters for Arrays of struct */
   function getValidRevealers(uint256 roomNo) external view returns (address[] memory) {
@@ -131,17 +139,15 @@ contract HalalGamble {
       rooms[roomNo].invalidRevealers.push(msg.sender);
     }
 
-    emit Revealed(roomNo, msg.sender, validReveal, rndNumber);
+    rooms[roomNo].revealExpiresAt = block.timestamp + REVEAL_EXPIRATION_PERIOD;
+    emit Revealed(roomNo, msg.sender, validReveal, rndNumber, rooms[roomNo].revealExpiresAt);
 
     uint256 totalReveals = rooms[roomNo].invalidRevealers.length + rooms[roomNo].validRevealers.length;
-    rooms[roomNo].revealExpiresAt = block.timestamp + REVEAL_EXPIRATION_PERIOD;
     if (totalReveals == rooms[roomNo].capacity) _determineWinnerAndPay(roomNo);
   }
 
-  uint256 public constant REVEAL_EXPIRATION_PERIOD = 3 minutes;
-
   function triggerRevealExpiry(uint256 roomNo) external {
-    require(rooms[roomNo].revealExpiresAt > block.timestamp, "Didn't expire yet");
+    require(block.timestamp > rooms[roomNo].revealExpiresAt, "Didn't expire yet");
     _determineWinnerAndPay(roomNo);
   }
 
