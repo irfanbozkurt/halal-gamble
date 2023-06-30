@@ -1,43 +1,13 @@
-...source of randomness is distributed...
+# 🎲 HalalGamble 🎲
 
-...other games like rps or ttt...
+HalalGamble is a gambling dApp template that employs a commit-reveal scheme to offload the randomness to the participants, eventually constructing a random number based on numbers submitted by the end users, which in turn yield a winner to be paid.
 
-...winner is dependent on valid reveals...
-...xor is calculated on-the-fly as people reveal...
-...no valid reveals no winner because last-man-attacks...
+## Live demo [here](https://halal-gamble-pv7cmkp4l-irfanbozkurt.vercel.app/)
 
-...but can we prevent last man attacks entirely?...
+<br>
 
-Current xor is put in the room display to emphasize that the on-chain randomness that we accumulate from users is totally simulatable off-chain. This simulation might yield intuition to the participants to realise fraudulent scenarios.
-
-Consider that a room of N participants is in the reveal phase, and M of N has already revealed their numbers. At that point we know who among the valid revealers will be the winner <u>if no more valid reveals are made</u>. The potential winner now can <u>bribe the N-M participants to perform an invalid reveal</u>. Like if one user has left to reveal, the winner can offer half of the prize to the last revealer and they can split.
-
-So even if we calculate the winner among valid revealers and forfeit the money staked by invalid revealers, there are still some **last man attack** situations making it harder to implement an iterative gambling application relying on a commit-reveal scheme.
-
-# 🏗 Scaffold-ETH 2
-
-🧪 An open-source, up-to-date toolkit for building decentralized applications (dapps) on the Ethereum blockchain. It's designed to make it easier for developers to create and deploy smart contracts and build user interfaces that interact with those contracts.
-
-⚙️ Built using NextJS, RainbowKit, Hardhat, Wagmi, and Typescript.
-
-- ✅ **Contract Hot Reload**: Your frontend auto-adapts to your smart contract as you edit it.
-- 🔥 **Burner Wallet & Local Faucet**: Quickly test your application with a burner wallet and local faucet.
-- 🔐 **Integration with Wallet Providers**: Connect to different wallet providers and interact with the Ethereum network.
-
-## Contents
-
-- [Requirements](#requirements)
-- [Quickstart](#quickstart)
-- [Deploying your Smart Contracts to a Live Network](#deploying-your-smart-contracts-to-a-live-network)
-- [Deploying your NextJS App](#deploying-your-nextjs-app)
-- [Interacting with your Smart Contracts: SE-2 Custom Hooks](#interacting-with-your-smart-contracts-se-2-custom-hooks)
-- [Disabling Type & Linting Error Checks](#disabling-type-and-linting-error-checks)
-  - [Disabling commit checks](#disabling-commit-checks)
-  - [Deploying to Vercel without any checks](#deploying-to-vercel-without-any-checks)
-  - [Disabling Github Workflow](#disabling-github-workflow)
-- [Contributing to Scaffold-ETH 2](#contributing-to-scaffold-eth-2)
-
-## Requirements
+<details>
+<summary>Requirements</summary>
 
 Before you begin, you need to install the following tools:
 
@@ -45,280 +15,80 @@ Before you begin, you need to install the following tools:
 - Yarn ([v1](https://classic.yarnpkg.com/en/docs/install/) or [v2+](https://yarnpkg.com/getting-started/install))
 - [Git](https://git-scm.com/downloads)
 
-## Quickstart
+</details>
 
-To get started with Scaffold-ETH 2, follow the steps below:
+<br>
 
-1. Clone this repo & install dependencies
+# Inspiration
 
-```
-git clone https://github.com/scaffold-eth/scaffold-eth-2.git
-cd scaffold-eth-2
-yarn install
-```
+Commit-reveal comes as an important solution for generating randomness on-chain, as blockchains are meant to be deterministic. Random number generation must be offloaded to oracles or a live network of randomness providers.
 
-2. Run a local network in the first terminal:
+In cases like interactive, especially luck-based games, we usualy have a live cohort of users waiting for a resolution, maybe to see who the winner will be. This kind of scenarios enable offloading the randomness generation responsibility to the participants directly, and this is what HalalGamble demonstrates.
 
-```
-yarn chain
-```
+# How it works & How to interact
 
-This command starts a local Ethereum network using Hardhat. The network runs on your local machine and can be used for testing and development. You can customize the network configuration in `hardhat.config.ts`.
+## What's a room and how to create one
 
-3. On a second terminal, deploy the test contract:
+HalalGamble works with game rooms, and anyone can create a game room if they pay the entrance fee, which is again defined by the room creator. Room creation requires 2 inputs: <u>roomFee</u> and <u>capacity</u>. Capacity denotes the number of intended players, and a room can only go live when the capacity is entirely fulfilled. Anyone joining the room must pay the <u>roomFee</u> specified here, and the big prize of this room will exactly be <u>roomFee \* capacity</u>.
 
-```
-yarn deploy
-```
+![img](./assets/create_room.png)
 
-This command deploys a test smart contract to the local network. The contract is located in `packages/hardhat/contracts` and can be modified to suit your needs. The `yarn deploy` command uses the deploy script located in `packages/hardhat/deploy` to deploy the contract to the network. You can also customize the deploy script.
+The hash at the bottom is your cryptographic commitment to the potential room you'll be creating by pressing the send button. It's automatically generated based on the connected account address and an automatically generated and stored random number.
 
-4. On a third terminal, start your NextJS app:
+It's easy to see why the commitment contains a random number, but why does the commitment contain the user address? Because other people can join to your room with your hash, effectively replaying your commitment. This user can then wait for your reveal and then reveal the same number themselves.
 
-```
-yarn start
-```
+After the room is created, you're waiting for other people to pay the entrance fee and join. People must generate a random number and bake the same kind of commitment you did while creating the room.
 
-Visit your app on: `http://localhost:3000`. You can interact with your smart contract using the contract component or the example ui in the frontend. You can tweak the app config in `packages/nextjs/scaffold.config.ts`.
+## Joining a room
 
-Run smart contract test with `yarn hardhat:test`
+Rooms awaiting participants AND rooms being played live are displayed under 'all active rooms' section. Rooms are listed here as the front-end is subscribed to the room creation events that we define on-chain.
 
-- Edit your smart contract `HalalGamble.sol` in `packages/hardhat/contracts`
-- Edit your frontend in `packages/nextjs/pages`
-- Edit your deployment scripts in `packages/hardhat/deploy`
+![img2](./assets/active_rooms.png)
 
-## Deploying your Smart Contracts to a Live Network
+Users can join existing rooms if there's available capacity, or abolish the rooms they created before the gambling begins. The latter would perform a refund to awaiting participants and finish the game there.
 
-Once you are ready to deploy your smart contracts, there are a few things you need to adjust.
+When a user joins a room, a random number is generated, written to local storage; then this number is packed with user address, and hashed. This is exactly the same process that happens with creating a room.
 
-1. Select the network
+## Interacting with a live room
 
-By default, `yarn deploy` will deploy the contract to the local network. You can change the defaultNetwork in `packages/hardhat/hardhat.config.ts.` You could also simply run `yarn deploy --network target_network` to deploy to another network.
+The game goes live when a room's capacity is saturated. There are N people in the room and they all generated their randomness and made their commitments at this point.
 
-Check the `hardhat.config.ts` for the networks that are pre-configured. You can also add other network settings to the `hardhat.config.ts file`. Here are the [Alchemy docs](https://docs.alchemy.com/docs/how-to-add-alchemy-rpc-endpoints-to-metamask) for information on specific networks.
+![img2](./assets/live_room.png)
 
-Example: To deploy the contract to the Sepolia network, run the command below:
+We see static room details at the top, and dynamic information in the middle. This view gets updated as more people interact with the room, via chain events coming from the contract.
 
-```
-yarn deploy --network sepolia
-```
+### Valid and Invalid Reveals
 
-2. Generate a new account or add one to deploy the contract(s) from. Additionally you will need to add your Alchemy API key. Rename `.env.example` to `.env` and fill the required keys.
+A valid reveal is when a participant reveals their random number correctly. If this sentence doesn't tick, look at the bottom left of the screenshot. That is the random number the front-end javascript created for the given participant. As this number is not managed by an on-chain logic or storage, the user has the full responsibility to provide the same random number they used to bake the initial commitment to join the room. HalalGamble comes with HalalFrontEnd which performs this operation automatically for you, but what if you remove that random number from your browser's local storage o.O ?!?
 
-```
-ALCHEMY_API_KEY="",
-DEPLOYER_PRIVATE_KEY=""
-```
+HalalGamble forfeits invalid reveals, so their money will be granted to the winner. This is because the participant failed to fulfill their responsibility of providing randomness to the game. So what happens if nobody provides a valid reveal? HalalGamble refunds the room fee to the participants. No harm done.
 
-The deployer account is the account that will deploy your contracts. Additionally, the deployer account will be used to execute any function calls that are part of your deployment script.
+HalalGamble holds an <u>xor accumulator</u> per room, getting xor'ed with every random number coming from valid reveals. As participants keep revealing their numbers, the xor tick gets updated. This xor operation could well be done at once after the revealing phase completely ends, but then think about a case where a room contains a big number of participants: the EOA making the final call iterating over all reveals and accumulating the XOR would pay a lot of gas fees. Performing accumulations on-the-fly is a more scalable option then having one final trigger that performs a big for loop.
 
-You can generate a random account / private key with `yarn generate` or add the private key of your crypto wallet. `yarn generate` will create a random account and add the DEPLOYER_PRIVATE_KEY to the .env file. You can check the generated account with `yarn account`.
+Valid reveals emit chain events, which are heard by the front end to update the displayed xor value. That display is there to emphasize the fact that on-chain randomness that we accumulate from users <u>up to a given time</u> is totally simulatable off-chain. Another thing the xor display is emphasizing is <u>if no more valid reveals come after this point, the winner will be the displayed participant</u>. This is consistent with what we have been discussing so far: we can only rely on valid reveals to generate randomness, and punish the invalid revealers to discourage this behavior. At any time we know who made the valid reveals, so we can pre-determine who the winner will be if the game ends with given status quo.
 
-3. Deploy your smart contract(s)
+### Determining the winner
 
-Run the command below to deploy the smart contract to the target network. Make sure to have some funds in your deployer account to pay for the transaction.
+Invalid revealers fail to provide randomness, and their submissions are not considered when determining the winner. Winner determination can only happen <u>after everyone submits their reveals</u>, because we don't know what the eventual number will be until everyone reveals theirs.
 
-```
-yarn deploy --network network_name
-```
+We have an xor value accumulated from valid reveals in the end, and this xor value is our random number. You can now take this random number and build an ending mechanism with it: will you determine one single winner, will you determine 3 winners, will multiple winners get the same reward, etc. HalalGamble performs a traditional modulo operation over the valid revelers to come up with the winning index.
 
-4. Verify your smart contract
+The xor operation is also <u>order independent</u>, which is a good thing as miners can manipulate the transaction orders. Nature of xor operation disables these kinds of attacks.
 
-You can verify your smart contract on Etherscan by running:
+### What if a participant doesn't reveal?
 
-```
-yarn verify --network network_name
-```
+HalalGamble defines a time period of 3 minutes (configurable), and whenever a participant makes a reveal, it sets a <u>reveal expiry date</u> which is reveal time + 3 minutes. This expiry date is NOT set until the first reveal comes, and it gets updated with each incoming reveal.
 
-## Deploying your NextJS App
+If after waiting a long time nobody continues to make reveals, anyone can call the **triggerRevealExpiry** function to distribute the reward to the current winner. If a participant refreshes the page 3 minutes after the last reveal, they'll see a <u>FINISH GAME</u> button, which will perform this action. This effort is a guard against lazy participants that don't want to reveal their numbers, preventing the valid revealers to get their earnings.
 
-**Hint**: We recommend connecting your GitHub repo to Vercel (through the Vercel UI) so it gets automatically deployed when pushing to `main`.
+Of course this introduces a sensitive dynamic and the 3 minute time period must be adjusted very carefully to the needs of the gambling platform.
 
-If you want to deploy directly from the CLI, run `yarn vercel` and follow the steps to deploy to Vercel. Once you log in (email, github, etc), the default options should work. It'll give you a public URL.
+## Is this approach viable?
 
-If you want to redeploy to the same production URL you can run `yarn vercel --prod`. If you omit the `--prod` flag it will deploy it to a preview/test URL.
+Although we enforce the participants to pay a fee at the entrance, we cannot entirely prevent consensus among participants: they can talk to each other, reveal their numbers to each other, and act together.
 
-**Make sure your `packages/nextjs/scaffold.config.ts` file has the values you need.**
+Consider the screenshot in the live room example. We have 4 participants, 2 have made valid reveals, and 2 are pending. There's no way to stop the current winner to <u>offer pending revealers to split the winnings</u>, so they don't make a reveal, and eventually the reveal expiry trigger is run. If there wasn't an expiry trigger, the money would be locked up there, or maybe you could employ a refund mechanism after a long period.
 
-## Interacting with your Smart Contracts: SE-2 Custom Hooks
+Normally in lottery-like scenarios you have days or even weeks of commit and reveal phases, and huge number of participants; so reveal expiry isn't really a problem. But HalalGamble tries to demonstrate a short-term small-sized gambling scenario so reveal expiry is a problem.
 
-Scaffold-ETH 2 provides a collection of custom React hooks designed to simplify interactions with your deployed smart contracts. These hooks are wrappers around `wagmi`, automatically loading the necessary contract ABI and address. They offer an easy-to-use interface for reading from, writing to, and monitoring events emitted by your smart contracts.
-
-To help developers get started with smart contract interaction using Scaffold-ETH 2, we've provided the following custom hooks:
-
-- [useScaffoldContractRead](#usescaffoldcontractread): for reading public variables and getting data from read-only functions of your contract.
-- [useScaffoldContractWrite](#usescaffoldcontractwrite): for sending transactions to your contract to write data or perform an action.
-- [useScaffoldEventSubscriber](#usescaffoldeventsubscriber): for subscribing to your contract events and receiving real-time updates when events are emitted.
-- [useScaffoldEventHistory](#usescaffoldeventhistory): for retrieving historical event logs for your contract, providing past activity data.
-- [useDeployedContractInfo](#usedeployedcontractinfo): for fetching details from your contract, including the ABI and address.
-- [useScaffoldContract](#usescaffoldcontract): for obtaining a contract instance that lets you interact with the methods of your deployed smart contract.
-
-These hooks offer a simplified and streamlined interface for interacting with your smart contracts. If you need to interact with external contracts, you can use `wagmi` directly, or add external contract data to your `deployedContracts.ts` file.
-
-### useScaffoldContractRead:
-
-Use this hook to read public variables and get data from read-only functions of your smart contract.
-
-```ts
-const { data: totalCounter } = useScaffoldContractRead({
-  contractName: "HalalGamble",
-  functionName: "getGreeting",
-  args: ["ARGUMENTS IF THE FUNCTION ACCEPTS ANY"],
-});
-```
-
-This example retrieves the data returned by the `getGreeting` function of the `HalalGamble` smart contract. If the function accepts any arguments, they can be passed in the args array. The retrieved data is stored in the `data` property of the returned object.
-
-### useScaffoldContractWrite:
-
-Use this hook to send a transaction to your smart contract to write data or perform an action.
-
-```ts
-const { writeAsync, isLoading, isMining } = useScaffoldContractWrite({
-  contractName: "HalalGamble",
-  functionName: "setGreeting",
-  args: ["The value to set"],
-  // For payable functions, expressed in ETH
-  value: "0.01",
-  // The number of block confirmations to wait for before considering transaction to be confirmed (default : 1).
-  blockConfirmations: 1,
-  // The callback function to execute when the transaction is confirmed.
-  onBlockConfirmation: (txnReceipt) => {
-    console.log("Transaction blockHash", txnReceipt.blockHash);
-  },
-});
-```
-
-To send the transaction, you can call the `writeAsync` function returned by the hook. Here's an example usage:
-
-```ts
-<button className="btn btn-primary" onClick={writeAsync}>
-  Send TX
-</button>
-```
-
-This example sends a transaction to the `HalalGamble` smart contract to call the `setGreeting` function with the arguments passed in `args`. The `writeAsync` function sends the transaction to the smart contract, and the `isLoading` and `isMining` properties indicate whether the transaction is currently being processed by the network.
-
-### useScaffoldEventSubscriber:
-
-Use this hook to subscribe to events emitted by your smart contract, and receive real-time updates when these events are emitted.
-
-```ts
-useScaffoldEventSubscriber({
-  contractName: "HalalGamble",
-  eventName: "GreetingChange",
-  // The listener function is called whenever a GreetingChange event is emitted by the contract.
-  // It receives the parameters emitted by the event, for this example: GreetingChange(address greetingSetter, string newGreeting, bool premium, uint256 value);
-  listener: (greetingSetter, newGreeting, premium, value) => {
-    console.log(greetingSetter, newGreeting, premium, value);
-  },
-});
-```
-
-This example subscribes to the `GreetingChange` event emitted by the `HalalGamble` smart contract, and logs the parameters emitted by the event to the console whenever it is emitted. The `listener` function accepts the parameters emitted by the event, and can be customized according to your needs.
-
-### useScaffoldEventHistory:
-
-Use this hook to retrieve historical event logs for your smart contract, providing past activity data.
-
-```ts
-const {
-  data: events,
-  isLoading: isLoadingEvents,
-  error: errorReadingEvents,
-  } = useScaffoldEventHistory({
-  contractName: "HalalGamble",
-  eventName: "GreetingChange",
-  // Specify the starting block number from which to read events.
-  fromBlock: 31231,
-  blockData: true,
-  // Apply filters to the event based on parameter names and values { [parameterName]: value },
-  filters: { premium: true }
-  // If set to true it will return the transaction data for each event (default: false),
-  transactionData: true,
-  // If set to true it will return the receipt data for each event (default: false),
-  receiptData: true
-});
-```
-
-This example retrieves the historical event logs for the `GreetingChange` event of the `HalalGamble` smart contract, starting from block number 31231 and filtering events where the premium parameter is true. The data property of the returned object contains an array of event objects, each containing the event parameters and (optionally) the block, transaction, and receipt data. The `isLoading` property indicates whether the event logs are currently being fetched, and the `error` property contains any error that occurred during the fetching process (if applicable).
-
-### useDeployedContractInfo:
-
-Use this hook to fetch details about a deployed smart contract, including the ABI and address.
-
-```ts
-// ContractName: name of the deployed contract
-const { data: deployedContractData } = useDeployedContractInfo(contractName);
-```
-
-This example retrieves the details of the deployed contract with the specified name and stores the details in the deployedContractData object.
-
-### useScaffoldContract:
-
-Use this hook to get your contract instance by providing the contract name. It enables you interact with your contract methods.
-For reading data or sending transactions, it's recommended to use `useScaffoldContractRead` and `useScaffoldContractWrite`.
-
-```ts
-const { data: HalalGamble } = useScaffoldContract({
-  contractName: "HalalGamble",
-});
-// Returns the greeting and can be called in any function, unlike useScaffoldContractRead
-await HalalGamble?.greeting();
-
-// Used to write to a contract and can be called in any function
-import { Signer } from "ethers";
-import { useSigner } from "wagmi";
-
-const { data: signer, isError, isLoading } = useSigner();
-const { data: HalalGamble } = useScaffoldContract({
-  contractName: "HalalGamble",
-  signerOrProvider: signer as Signer,
-});
-const setGreeting = async () => {
-  // Call the method in any function
-  await HalalGamble?.setGreeting("the greeting here");
-};
-```
-
-This example uses the `useScaffoldContract` hook to obtain a contract instance for the `HalalGamble` smart contract. The data property of the returned object contains the contract instance that can be used to call any of the smart contract methods.
-
-## Disabling type and linting error checks
-
-> **Hint**
-> Typescript helps you catch errors at compile time, which can save time and improve code quality, but can be challenging for those who are new to the language or who are used to the more dynamic nature of JavaScript. Below are the steps to disable type & lint check at different levels
-
-### Disabling commit checks
-
-We run `pre-commit` [git hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) which lints the staged files and don't let you commit if there is an linting error.
-
-To disable this, go to `.husky/pre-commit` file and comment out `yarn lint-staged --verbose`
-
-```diff
-- yarn lint-staged --verbose
-+ # yarn lint-staged --verbose
-```
-
-### Deploying to Vercel without any checks
-
-By default, Vercel runs types and lint checks before building your app. The deployment will fail if there are any types or lint errors.
-
-To ignore these checks while deploying from the CLI, use:
-
-```shell
-yarn vercel:yolo
-```
-
-If your repo is connected to Vercel, you can set `NEXT_PUBLIC_IGNORE_BUILD_ERROR` to `true` in a [environment variable](https://vercel.com/docs/concepts/projects/environment-variables).
-
-### Disabling Github Workflow
-
-We have github workflow setup checkout `.github/workflows/lint.yaml` which runs types and lint error checks every time code is **pushed** to `main` branch or **pull request** is made to `main` branch
-
-To disable it, **delete `.github` directory**
-
-## Contributing to Scaffold-ETH 2
-
-We welcome contributions to Scaffold-ETH 2!
-
-Please see [CONTRIBUTING.MD](https://github.com/scaffold-eth/scaffold-eth-2/blob/main/CONTRIBUTING.md) for more information and guidelines for contributing to Scaffold-ETH 2.
+🤪 🤪 Or you can create a room for 1000, join with 999 of your accounts, and wait for a prey 🤪 🤪 For this not to happen we need to have on-chain identity infrastructure installed (via Chainlink or sth), which we don't demonstrate in this work, so the users carry the responsibility of not joining rooms that they don't trust.
