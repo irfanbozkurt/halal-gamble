@@ -89,4 +89,4 @@ Consider the screenshot in the live room example. We have 4 participants, 2 have
 
 Normally in lottery-like scenarios you have days or even weeks of commit and reveal phases, and huge number of participants; so reveal expiry isn't really a problem. But HalalGamble tries to demonstrate a short-term small-sized gambling scenario so reveal expiry is a problem.
 
-🤪 🤪 Or you can create a room for 1000, join with 999 of your accounts, and wait for a prey 🤪 🤪 For this not to happen we need to have on-chain identity infrastructure installed (via Chainlink or sth), which we don't demonstrate in this work, so the users carry the responsibility of not joining rooms that they don't trust.
+🤪 🤪 Or you can create a room for 1000, join with 999 of your accounts, and wait for a prey 🤪 🤪 For this not to happen we need to have on-chain identity infrastructure installed (via Chainlink or sth). HalalGamble does not come with such an integration so the users carry the responsibility of not joining rooms that they don't trust :)
