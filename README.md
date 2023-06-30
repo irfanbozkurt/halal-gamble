@@ -17,7 +17,7 @@ Before you begin, you need to install the following tools:
 
 </details>
 
-# Inspiration
+# Motivation
 
 Commit-reveal comes as an important solution for generating randomness on-chain, as blockchains are meant to be deterministic. Random number generation must be offloaded to oracles or a live network of randomness providers.
 
