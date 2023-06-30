@@ -9,7 +9,12 @@ import {
   getParsedContractFunctionArgs,
   getParsedEthersError,
 } from "~~/components/scaffold-eth";
-import { useScaffoldEventHistory, useScaffoldEventSubscriber, useTransactor } from "~~/hooks/scaffold-eth";
+import {
+  useScaffoldContractWrite,
+  useScaffoldEventHistory,
+  useScaffoldEventSubscriber,
+  useTransactor,
+} from "~~/hooks/scaffold-eth";
 import { TActiveRoomProps } from "~~/types/halalTypes";
 import { getTargetNetwork, notification, parseTxnValue } from "~~/utils/scaffold-eth";
 
@@ -35,6 +40,37 @@ export const ActiveRoom = ({
 
   if (!roomNo) return null;
 
+  //////////////////////////////////////////
+  /*********** Get Room History ***********/
+  //////////////////////////////////////////
+  const { data: enterRoomEvents } = useScaffoldEventHistory({
+    contractName: "HalalGamble",
+    eventName: "EnterRoom",
+    fromBlock: Number(process.env.NEXT_PUBLIC_DEPLOY_BLOCK) || 0,
+    filters: {
+      roomNo: ethers.BigNumber.from(roomNo),
+    },
+    blockData: false,
+  });
+
+  const [participants, setParticipants] = useState<string[]>([]);
+
+  useEffect(() => {
+    setParticipants(
+      enterRoomEvents == undefined || enterRoomEvents.length == 0 ? [] : enterRoomEvents?.map(e => e.args[1] as string),
+    );
+  }, [enterRoomEvents]);
+
+  useScaffoldEventSubscriber({
+    contractName: "HalalGamble",
+    eventName: "EnterRoom",
+    listener: (_roomNo, entrar) => {
+      if (_roomNo.toString() != roomNo) return;
+      setParticipants(prev => Array.from(new Set([entrar, ...prev])));
+      triggerMyRooms(prev => !prev);
+    },
+  });
+
   /////////////////////////////////////////////
   /*********** join room tx prepare **********/
   /////////////////////////////////////////////
@@ -46,7 +82,7 @@ export const ActiveRoom = ({
   const writeTxn = useTransactor();
   const writeDisabled = !chain || chain?.id !== getTargetNetwork().id;
 
-  const { isLoading, writeAsync: joinRoom } = useContractWrite({
+  const { isLoading: isJoinRoomLoading, writeAsync: joinRoom } = useContractWrite({
     address: contractAddress,
     functionName: joinRoomFn && joinRoomFn.name,
     abi: joinRoomFn && [joinRoomFn],
@@ -57,10 +93,34 @@ export const ActiveRoom = ({
     },
   });
 
+  const [disableAfterSuccess, setDisableAfterSuccess] = useState(false);
+  let userJoinedRoom =
+    currentAccount && currentAccount != creatorAddress && participants.includes(currentAccount) && !isJoinRoomLoading;
+  const isRoomFull = Array.from(participants).length == capacity;
+
+  const joinButton = currentAccount != creatorAddress && (
+    <button
+      className={`bg-orange-100 btn btn-sm ${isJoinRoomLoading ? "loading" : ""} bg`}
+      disabled={writeDisabled || isJoinRoomLoading || userJoinedRoom || isRoomFull || disableAfterSuccess}
+      onClick={async () => {
+        if (!joinRoom) return;
+        try {
+          await writeTxn(joinRoom());
+          setDisableAfterSuccess(true);
+          triggerMyRooms(prev => !prev);
+        } catch (e: any) {
+          const message = getParsedEthersError(e);
+          notification.error(message);
+        }
+      }}
+    >
+      {!isJoinRoomLoading && (userJoinedRoom ? <> JOINED </> : isRoomFull ? <> FULL </> : <> JOIN </>)}
+    </button>
+  );
+
   /////////////////////////////////////////////
   /****************** RND ********************/
   /////////////////////////////////////////////
-
   useEffect(() => {
     if (!roomNo) {
       console.log(`RETURNING FROM useEffect BECAUSE roomNo is ${roomNo}`);
@@ -108,97 +168,52 @@ export const ActiveRoom = ({
   }, [currentAccount]);
 
   //////////////////////////////////////////
-  /*********** Get Room History ***********/
+  /********** Abolish Management **********/
   //////////////////////////////////////////
-  const { data: enterRoomEvents } = useScaffoldEventHistory({
+  const { writeAsync: abolishRoom, isLoading: isAbolishRoomLoading } = useScaffoldContractWrite({
     contractName: "HalalGamble",
-    eventName: "EnterRoom",
-    fromBlock: Number(process.env.NEXT_PUBLIC_DEPLOY_BLOCK) || 0,
-    filters: {
-      roomNo: ethers.BigNumber.from(roomNo),
-    },
-    blockData: false,
-  });
-
-  const [participants, setParticipants] = useState<string[]>([]);
-
-  useEffect(() => {
-    setParticipants(
-      enterRoomEvents == undefined || enterRoomEvents.length == 0 ? [] : enterRoomEvents?.map(e => e.args[1] as string),
-    );
-  }, [enterRoomEvents]);
-
-  useScaffoldEventSubscriber({
-    contractName: "HalalGamble",
-    eventName: "EnterRoom",
-    listener: (_roomNo, entrar) => {
-      if (_roomNo.toString() != roomNo) return;
-      setParticipants(prev => Array.from(new Set([entrar, ...prev])));
+    functionName: "abolishRoom",
+    args: [ethers.BigNumber.from(roomNo)],
+    onBlockConfirmation: txnReceipt => {
       triggerMyRooms(prev => !prev);
     },
   });
 
-  //////////////////////////////////////////
-  /*********** Button Management **********/
-  //////////////////////////////////////////
-  const [disableAfterSuccess, setDisableAfterSuccess] = useState(false);
-  let buttonText = "";
-  let userJoinedRoom = false;
-  if (currentAccount)
-    if (participants.includes(currentAccount)) {
-      if (!isLoading) {
-        buttonText = "JOINED";
-        userJoinedRoom = true;
-      } else userJoinedRoom = false;
-    } else {
-      userJoinedRoom = false;
-    }
-  else userJoinedRoom = false;
-
-  const isRoomFull = Array.from(participants).length == capacity;
+  const abolishButton = currentAccount == creatorAddress && (
+    <button
+      className={`bg-orange-100 btn btn-sm ${isAbolishRoomLoading ? "loading" : ""} bg`}
+      disabled={writeDisabled || isAbolishRoomLoading || isRoomFull}
+      onClick={async () => {
+        if (!abolishRoom) return;
+        try {
+          await abolishRoom();
+          triggerMyRooms(prev => !prev);
+        } catch (e: any) {
+          const message = getParsedEthersError(e);
+          notification.error(message);
+        }
+      }}
+    >
+      {!isAbolishRoomLoading && <> ABOLISH </>}
+    </button>
+  );
 
   return (
     <div
-      className={`flex overflow-hidden h-20 px-3 rounded-3xl bg-gradient-to-r from-purple-500 to-green-600 ${
+      className={`flex items-center space-x-3 overflow-hidden h-20 px-3 rounded-3xl bg-gradient-to-r from-purple-500 to-green-600 ${
         userJoinedRoom ? "opacity-40" : "opacity-90"
       } border-primary`}
     >
-      <div className="flex items-center space-x-3 ">
-        <button
-          className={`bg-orange-100 btn btn-sm ${isLoading ? "loading" : ""} bg`}
-          disabled={writeDisabled || isLoading || userJoinedRoom || isRoomFull || disableAfterSuccess}
-          onClick={async () => {
-            if (!joinRoom) return;
-            try {
-              await writeTxn(joinRoom());
-              setDisableAfterSuccess(true);
-              triggerMyRooms(prev => !prev);
-            } catch (e: any) {
-              const message = getParsedEthersError(e);
-              notification.error(message);
-            }
-          }}
-        >
-          {!isLoading &&
-            (userJoinedRoom ? (
-              <> JOINED </>
-            ) : isRoomFull ? (
-              <> FULL </>
-            ) : disableAfterSuccess ? (
-              <>JOINED</>
-            ) : (
-              <> JOIN </>
-            ))}
-        </button>
+      {joinButton}
+      {abolishButton}
 
-        <Address address={creatorAddress} disableAddressLink={true} />
+      <Address address={creatorAddress} disableAddressLink={true} />
 
-        <span className="text-xl text-orange-100 text-center">
-          {Array.from(participants).length} / {capacity} Participants
-        </span>
-        <div className="flex w-full justify-start">
-          <span className="text-xl text-green-100 text-center">💸: {ethers.utils.formatEther(roomFee.toString())}</span>
-        </div>
+      <span className="text-xl text-orange-100 text-center">
+        {Array.from(participants).length} / {capacity} Participants
+      </span>
+      <div className="flex w-full justify-start">
+        <span className="text-xl text-green-100 text-center">💸: {ethers.utils.formatEther(roomFee.toString())}</span>
       </div>
     </div>
   );
