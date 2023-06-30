@@ -2,7 +2,7 @@
 
 HalalGamble is a gambling dApp template that employs a commit-reveal scheme to offload the randomness to the participants, eventually constructing a random number based on numbers submitted by the end users, which in turn yield a winner to be paid.
 
-## Live demo [here](https://halal-gamble-pv7cmkp4l-irfanbozkurt.vercel.app/)
+### Live demo [here](https://halal-gamble-pv7cmkp4l-irfanbozkurt.vercel.app/)
 
 <br>
 
@@ -16,8 +16,6 @@ Before you begin, you need to install the following tools:
 - [Git](https://git-scm.com/downloads)
 
 </details>
-
-<br>
 
 # Inspiration
 
