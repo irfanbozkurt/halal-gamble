@@ -17,7 +17,7 @@ export const ActiveRoomList = ({ triggerMyRooms, rooms, joinRoomFn, contractAddr
     return 0;
   });
   return (
-    <div className="w-full max-w-3xl flex flex-col overflow-hidden h-96 px-4 pt-3 opacity-80 rounded-3xl shadow-lg border-2 border-primary bg-gradient-to-l from-purple-800 to-green-800">
+    <div className="w-full max-w-3xl flex flex-col overflow-hidden h-84 px-4 pt-3 opacity-80 rounded-3xl shadow-lg border-2 border-primary bg-gradient-to-l from-purple-800 to-green-800">
       <span className="text-6xl text-orange-100 pb-3">all active rooms</span>
       {(!rooms || rooms.length == 0) && <span className="text-4xl pt-10 text-red-200">no active room</span>}
       {rooms && rooms.length > 0 && (

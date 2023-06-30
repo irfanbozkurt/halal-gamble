@@ -96,6 +96,11 @@ module.exports = {
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
       },
+
+      height: {
+        84: "21rem",
+      },
+
       keyframes: {
         grow: {
           "0%": {
